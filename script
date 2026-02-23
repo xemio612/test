@@ -1,19 +1,3 @@
--- ANTI AFK made by Muscle_legends2021 [Gio]
- 
-local VirtualUser = game:GetService('VirtualUser')
- 
-game:GetService('Players').LocalPlayer.Idled:Connect(function()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new())
-end)
- 
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "AntiAFK loaded!",
-    Text = "Made by Gio",
-    Button1 = "Thanks",
-    Duration = 5
-})
--- lua script   
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -21,33 +5,15 @@ local player = Players.LocalPlayer
 
 _G.Active = false
 _G.Running = true 
-_G.UseTween = true -- true = tween, false = teleport (CIĘCIE)
-local speed = 22 -- studs/s
+_G.UseTween = true 
+local speed = 22 
 local ignored = {}
 
--- OBSŁUGA CHARACTERA PO RESEKCIE
-local currentCharacter = nil
-
-local function onCharacterAdded(char)
-    currentCharacter = char
-    ignored = {} -- czyścimy stare targety
-    -- nie wyłączamy farmy (_G.Active zostaje taki jak był)
-    -- aktualizujemy GUI przy respawnie tylko jeśli jest włączone
-    if player.PlayerGui:FindFirstChild("FastFarm") then
-        local gui = player.PlayerGui.FastFarm
-        local btn = gui:FindFirstChild("TextButton")
-        if btn then
-            btn.BackgroundColor3 = _G.Active
-                and Color3.fromRGB(50,150,50)
-                or Color3.fromRGB(150,50,50)
-        end
-    end
+-- Funkcja pomocnicza do pobierania aktualnego RootPart
+local function getRoot()
+    local char = player.Character or player.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart", 5)
 end
-
-if player.Character then
-    onCharacterAdded(player.Character)
-end
-player.CharacterAdded:Connect(onCharacterAdded)
 
 -- GUI
 if player.PlayerGui:FindFirstChild("FastFarm") then
@@ -90,10 +56,10 @@ close.TextColor3 = Color3.new(1,1,1)
 close.Parent = sg
 Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
 
--- NOCLIP
+-- NOCLIP (z poprawionym sprawdzaniem postaci)
 RunService.Stepped:Connect(function()
-    if _G.Active and currentCharacter then
-        for _, v in pairs(currentCharacter:GetDescendants()) do
+    if _G.Active and player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
             if v:IsA("BasePart") then
                 v.CanCollide = false
             end
@@ -105,14 +71,13 @@ end)
 task.spawn(function()
     while _G.Running do
         if _G.Active then
-            local char = currentCharacter
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-
-            if root then
+            local root = getRoot() -- Pobieramy świeży RootPart w każdej iteracji
+            
+            if root and root.Parent then
                 local target = nil
                 local dist = math.huge
 
-                -- szukanie najbliższego coina
+                -- Szukanie najbliższego coina
                 for _, v in pairs(workspace:GetDescendants()) do
                     if (v.Name == "Coin_Server" or v.Name == "Coin")
                         and v:IsA("BasePart")
@@ -125,7 +90,7 @@ task.spawn(function()
                     end
                 end
 
-                if target then
+                if target and target.Parent then
                     local targetCF = target.CFrame * CFrame.new(0, 3, 0)
 
                     if _G.UseTween then
@@ -137,7 +102,8 @@ task.spawn(function()
                         )
                         tween:Play()
 
-                        while target and target.Parent and _G.Active
+                        -- Czekaj aż doleci, ale przerwij jeśli postać padnie lub wyłączysz farmę
+                        while target and target.Parent and _G.Active and root and root.Parent
                             and (root.Position - target.Position).Magnitude > 2.5 do
                             task.wait()
                         end
@@ -145,30 +111,22 @@ task.spawn(function()
                         ignored[target] = true
                         tween:Cancel()
                     else
-                        -- TELEPORT
-                        local travelTime = dist / speed
-                        local startChar = currentCharacter
+                        -- TELEPORT (z czekaniem)
+                        task.wait(dist / speed)
 
-                        task.wait(travelTime)
-
-                        if _G.Active
-                            and currentCharacter == startChar
-                            and startChar
-                            and startChar:FindFirstChild("HumanoidRootPart")
-                            and target
-                            and target.Parent then
-
-                            startChar.HumanoidRootPart.CFrame = targetCF
+                        -- Sprawdzamy ponownie czy root i target istnieją po czekaniu
+                        if target and target.Parent and _G.Active and root and root.Parent then
+                            root.CFrame = targetCF
                             ignored[target] = true
                         end
                     end
                 else
-                    ignored = {}
-                    task.wait(0.1)
+                    ignored = {} -- Reset listy zignorowanych jeśli nie ma celów
+                    task.wait(0.5)
                 end
             end
         end
-        task.wait()
+        task.wait(0.1)
     end
 end)
 
