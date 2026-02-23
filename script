@@ -66,7 +66,7 @@ task.spawn(function()
                 if target then
                     -- KLUCZOWA ZMIANA: Celujemy dokładnie w środek monety (lub 0.5 unita pod nią), 
                     -- aby nogi i korpus na pewno przeszły przez jej hitbox.
-                    local targetPos = target.CFrame * CFrame.new(0, -1, 0) 
+                    local targetPos = target.CFrame * CFrame.new(0, 3, 0) 
                     
                     local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = targetPos})
                     tween:Play()
