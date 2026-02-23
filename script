@@ -134,7 +134,7 @@ modeBtn.MouseButton1Click:Connect(function()
     modeBtn.Text = _G.UseTween and "MODE: TWEEN" or "MODE: TELEPORT"
     modeBtn.BackgroundColor3 = _G.UseTween
         and Color3.fromRGB(60, 60, 160)
-        or Color3.fromRGB(160, 60, 60)
+        or Color3.fromRGB(160, 60, 255)
 end)
 
 close.MouseButton1Click:Connect(function()
