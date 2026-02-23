@@ -13,63 +13,130 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
     Button1 = "Thanks",
     Duration = 5
 })
--- lua script  
+-- lua script
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+
 local player = Players.LocalPlayer
 
 _G.Active = false
-_G.Running = true 
-_G.UseTween = true -- true = tween, false = teleport (CIĘCIE)
-local speed = 22 -- studs/s
+_G.Running = true
+_G.UseTween = true
+local speed = 22
 local ignored = {}
 
--- GUI
-if player.PlayerGui:FindFirstChild("FastFarm") then
-    player.PlayerGui.FastFarm:Destroy()
+-- stats
+local farmStart = 0
+local coinsCollected = 0
+
+-- ================= GUI =================
+local pg = player:WaitForChild("PlayerGui")
+if pg:FindFirstChild("FastFarm") then
+    pg.FastFarm:Destroy()
 end
 
 local sg = Instance.new("ScreenGui")
 sg.Name = "FastFarm"
-sg.Parent = player:WaitForChild("PlayerGui")
 sg.ResetOnSpawn = false
+sg.Parent = pg
 
+-- window
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 260, 0, 180)
+frame.Position = UDim2.new(0.5, -130, 0.05, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.BorderSizePixel = 0
+frame.Parent = sg
+Instance.new("UICorner", frame)
+
+-- header
+local header = Instance.new("TextLabel")
+header.Size = UDim2.new(1,0,0,35)
+header.BackgroundColor3 = Color3.fromRGB(45,45,45)
+header.Text = "FAST AUTOFARM V1"
+header.TextColor3 = Color3.new(1,1,1)
+header.Font = Enum.Font.SourceSansBold
+header.TextSize = 18
+header.Parent = frame
+Instance.new("UICorner", header)
+
+-- close X
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0,24,0,24)
+close.Position = UDim2.new(1,-28,0,6)
+close.BackgroundColor3 = Color3.fromRGB(180,0,0)
+close.Text = "X"
+close.TextColor3 = Color3.new(1,1,1)
+close.Font = Enum.Font.SourceSansBold
+close.TextSize = 14
+close.Parent = frame
+Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
+
+-- farm button
 local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0, 160, 0, 45)
-btn.Position = UDim2.new(0.5, -80, 0.05, 0)
-btn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+btn.Size = UDim2.new(0,200,0,40)
+btn.Position = UDim2.new(0.5,-100,0,50)
+btn.BackgroundColor3 = Color3.fromRGB(150,50,50)
 btn.Text = "FARM: OFF"
 btn.TextColor3 = Color3.new(1,1,1)
 btn.Font = Enum.Font.SourceSansBold
-btn.TextSize = 18
-btn.Parent = sg
+btn.TextSize = 16
+btn.Parent = frame
 Instance.new("UICorner", btn)
 
+-- mode button
 local modeBtn = Instance.new("TextButton")
-modeBtn.Size = UDim2.new(0, 160, 0, 35)
-modeBtn.Position = UDim2.new(0.5, -80, 0.05, 50)
-modeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 160)
+modeBtn.Size = UDim2.new(0,200,0,32)
+modeBtn.Position = UDim2.new(0.5,-100,0,95)
+modeBtn.BackgroundColor3 = Color3.fromRGB(60,60,160)
 modeBtn.Text = "MODE: TWEEN"
 modeBtn.TextColor3 = Color3.new(1,1,1)
 modeBtn.Font = Enum.Font.SourceSansBold
-modeBtn.TextSize = 16
-modeBtn.Parent = sg
+modeBtn.TextSize = 14
+modeBtn.Parent = frame
 Instance.new("UICorner", modeBtn)
 
-local close = Instance.new("TextButton")
-close.Size = UDim2.new(0, 25, 0, 25)
-close.Position = UDim2.new(0.5, 90, 0.05, 0)
-close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-close.Text = "X"
-close.TextColor3 = Color3.new(1,1,1)
-close.Parent = sg
-Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
+-- stats label
+local statsLabel = Instance.new("TextLabel")
+statsLabel.Size = UDim2.new(1,-20,0,30)
+statsLabel.Position = UDim2.new(0,10,0,135)
+statsLabel.BackgroundTransparency = 1
+statsLabel.Text = "Coins / Hour: 0"
+statsLabel.TextColor3 = Color3.fromRGB(200,200,200)
+statsLabel.Font = Enum.Font.SourceSans
+statsLabel.TextSize = 14
+statsLabel.TextXAlignment = Left
+statsLabel.Parent = frame
 
--- NOCLIP
+-- ================= BUTTONS =================
+btn.MouseButton1Click:Connect(function()
+    _G.Active = not _G.Active
+    btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
+    btn.BackgroundColor3 = _G.Active
+        and Color3.fromRGB(50,150,50)
+        or Color3.fromRGB(150,50,50)
+
+    if _G.Active and farmStart == 0 then
+        farmStart = os.clock()
+    end
+end)
+
+modeBtn.MouseButton1Click:Connect(function()
+    _G.UseTween = not _G.UseTween
+    modeBtn.Text = _G.UseTween and "MODE: TWEEN" or "MODE: TELEPORT"
+end)
+
+close.MouseButton1Click:Connect(function()
+    _G.Active = false
+    _G.Running = false
+    sg:Destroy()
+end)
+
+-- ================= NOCLIP =================
 RunService.Stepped:Connect(function()
     if _G.Active and player.Character then
-        for _, v in pairs(player.Character:GetDescendants()) do
+        for _,v in ipairs(player.Character:GetDescendants()) do
             if v:IsA("BasePart") then
                 v.CanCollide = false
             end
@@ -77,7 +144,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- LOGIKA FARMU
+-- ================= FARM =================
 task.spawn(function()
     while _G.Running do
         if _G.Active then
@@ -85,12 +152,11 @@ task.spawn(function()
             local root = char and char:FindFirstChild("HumanoidRootPart")
 
             if root then
-                local target = nil
+                local target
                 local dist = math.huge
 
-                -- szukanie najbliższego coina
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if (v.Name == "Coin_Server" or v.Name == "Coin")
+                for _,v in ipairs(workspace:GetDescendants()) do
+                    if (v.Name == "Coin" or v.Name == "Coin_Server")
                         and v:IsA("BasePart")
                         and not ignored[v] then
                         local d = (root.Position - v.Position).Magnitude
@@ -102,10 +168,9 @@ task.spawn(function()
                 end
 
                 if target then
-                    local targetCF = target.CFrame * CFrame.new(0, 3, 0)
+                    local targetCF = target.CFrame * CFrame.new(0,3,0)
 
                     if _G.UseTween then
-                        -- TWEEN
                         local tween = TweenService:Create(
                             root,
                             TweenInfo.new(dist / speed, Enum.EasingStyle.Linear),
@@ -113,21 +178,20 @@ task.spawn(function()
                         )
                         tween:Play()
 
-                        while target and target.Parent and _G.Active
-                            and (root.Position - target.Position).Magnitude > 3 do
+                        while _G.Active and target.Parent
+                            and (root.Position - target.Position).Magnitude > 2.5 do
                             task.wait()
                         end
 
-                        ignored[target] = true
                         tween:Cancel()
+                        ignored[target] = true
+                        coinsCollected += 1
                     else
-                        -- TELEPORT POPRAWNY (CIĘCIE)
-                        -- czekamy dokładnie tyle co tween by leciał
                         task.wait(dist / speed)
-
-                        if target and target.Parent and _G.Active then
+                        if target.Parent and _G.Active then
                             root.CFrame = targetCF
                             ignored[target] = true
+                            coinsCollected += 1
                         end
                     end
                 else
@@ -140,28 +204,16 @@ task.spawn(function()
     end
 end)
 
--- PRZYCISKI
-btn.MouseButton1Click:Connect(function()
-    _G.Active = not _G.Active
-    btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
-    btn.BackgroundColor3 = _G.Active
-        and Color3.fromRGB(50,150,50)
-        or Color3.fromRGB(150,50,50)
-    if _G.Active then
-        ignored = {}
+-- ================= STATS =================
+task.spawn(function()
+    while _G.Running do
+        if _G.Active and farmStart > 0 then
+            local elapsed = os.clock() - farmStart
+            if elapsed > 0 then
+                local perHour = math.floor((coinsCollected / elapsed) * 3600)
+                statsLabel.Text = "Coins / Hour: " .. perHour
+            end
+        end
+        task.wait(1)
     end
-end)
-
-modeBtn.MouseButton1Click:Connect(function()
-    _G.UseTween = not _G.UseTween
-    modeBtn.Text = _G.UseTween and "MODE: TWEEN" or "MODE: TELEPORT"
-    modeBtn.BackgroundColor3 = _G.UseTween
-        and Color3.fromRGB(60,60,160)
-        or Color3.fromRGB(160,60,60)
-end)
-
-close.MouseButton1Click:Connect(function()
-    _G.Active = false
-    _G.Running = false
-    sg:Destroy()
 end)
