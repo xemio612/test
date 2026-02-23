@@ -110,16 +110,31 @@ task.spawn(function()
         if _G.AutoFarmActive then
             local target = getClosestCoin()
             local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+
             if target and root then
-                local duration = (root.Position - target.Position).Magnitude / currentSpeed
-                local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
+                local distance = (root.Position - target.Position).Magnitude
+                local duration = distance / currentSpeed
+
+                local tween = TweenService:Create(
+                    root,
+                    TweenInfo.new(duration, Enum.EasingStyle.Linear),
+                    {CFrame = target.CFrame}
+                )
+
                 tween:Play()
-                
-                repeat task.wait() until not target or not target.Parent or not _G.AutoFarmActive
+
+                -- zamiast czekać aż coin zniknie
+                while _G.AutoFarmActive and target.Parent do
+                    if (root.Position - target.Position).Magnitude < 2 then
+                        break -- jesteśmy przy coinie, lecimy po następny
+                    end
+                    task.wait()
+                end
+
                 tween:Cancel()
             end
         end
-        task.wait(0.1)
+        task.wait(0.05)
     end
 end)
 
