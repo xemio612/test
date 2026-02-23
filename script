@@ -7,8 +7,10 @@ _G.Active = false
 _G.Running = true
 _G.AutoReset = false
 
-local speed = 22 -- bezpieczna prędkość
+local speed = 22
 local ignored = {}
+local noCoinTime = 0
+local RESET_DELAY = 3 -- sekundy bez coinów zanim resetnie
 
 -- GUI
 if player.PlayerGui:FindFirstChild("FastFarm") then
@@ -62,46 +64,42 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- SPRAWDZANIE COIN BAG (MM2)
-local function isCoinBagFull()
-    local gui = player:FindFirstChild("PlayerGui")
-    if not gui then return false end
-
-    local main = gui:FindFirstChild("MainGUI")
-    if not main then return false end
-
-    local gameGui = main:FindFirstChild("Game")
-    if not gameGui then return false end
-
-    local bag = gameGui:FindFirstChild("CoinBag")
-    if not bag then return false end
-
-    local container = bag:FindFirstChild("Container")
-    if not container then return false end
-
-    local amount = container:FindFirstChild("Amount")
-    local max = container:FindFirstChild("Max")
-    if not amount or not max then return false end
-
-    return tonumber(amount.Text) >= tonumber(max.Text)
+-- SPRAWDZANIE CZY SĄ COINY
+local function anyCoinsVisible()
+    for _,v in pairs(workspace:GetDescendants()) do
+        if (v.Name == "Coin" or v.Name == "Coin_Server") and v:IsA("BasePart") then
+            return true
+        end
+    end
+    return false
 end
 
--- AUTO RESET LOOP
+-- AUTO RESET GDY BRAK COINÓW
 task.spawn(function()
     while _G.Running do
-        if _G.AutoReset and isCoinBagFull() then
-            local char = player.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum.Health = 0
-                task.wait(2)
+        if _G.AutoReset and _G.Active then
+            if not anyCoinsVisible() then
+                noCoinTime += 0.5
+                if noCoinTime >= RESET_DELAY then
+                    local char = player.Character
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum.Health = 0
+                        noCoinTime = 0
+                        task.wait(2)
+                    end
+                end
+            else
+                noCoinTime = 0
             end
+        else
+            noCoinTime = 0
         end
         task.wait(0.5)
     end
 end)
 
--- LOGIKA FARMU
+-- FARM LOGIC
 task.spawn(function()
     while _G.Running do
         if _G.Active then
@@ -152,12 +150,12 @@ task.spawn(function()
     end
 end)
 
--- OBSŁUGA PRZYCISKÓW
+-- BUTTONS
 btn.MouseButton1Click:Connect(function()
     _G.Active = not _G.Active
     btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
     btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50,150,50) or Color3.fromRGB(150,50,50)
-    if _G.Active then ignored = {} end
+    ignored = {}
 end)
 
 resetBtn.MouseButton1Click:Connect(function()
