@@ -106,58 +106,16 @@ task.spawn(function()
                         ignored[target] = true
                         tween:Cancel()
                     else
-                        -- TELEPORT LOGICZNY
-                        -- 1. czekamy zgodnie z dystansem
-                        task.wait(dist / speed)
+                        
+    -- PRAWDZIWY TELEPORT (czekamy = dystans / speed, potem jedno cięcie)
+    local waitTime = dist / speed
 
-                        if not (_G.Active and target and target.Parent) then
-                            continue
-                        end
+    task.wait(waitTime)
 
-                        -- 2. teleport na coin
-                        root.CFrame = targetCF
-
-                        -- 3. 0.3s na coinie + liczenie następnego
-                        local nextTarget = nil
-                        local nextDist = math.huge
-                        local startTick = tick()
-
-                        while tick() - startTick < 0.3 do
-                            for _, v in pairs(workspace:GetDescendants()) do
-                                if (v.Name == "Coin_Server" or v.Name == "Coin")
-                                    and v:IsA("BasePart")
-                                    and not ignored[v]
-                                    and v ~= target then
-                                    local d = (root.Position - v.Position).Magnitude
-                                    if d < nextDist then
-                                        nextDist = d
-                                        nextTarget = v
-                                    end
-                                end
-                            end
-                            task.wait()
-                        end
-
-                        -- 4. oznaczamy coin
-                        ignored[target] = true
-
-                        -- 5. teleport do void
-                        root.CFrame = CFrame.new(0, 80, 0)
-
-                        -- 6. przygotowanie następnego (pętla i tak go złapie)
-                        if nextTarget then
-                            -- nic nie trzeba robić, dystans już policzony „legalnie”
-                        end
-                    end
-                else
-                    ignored = {}
-                    task.wait(0.1)
-                end
-            end
-        end
-        task.wait()
+    if target and target.Parent and _G.Active then
+        root.CFrame = targetCF
     end
-end)
+end
 
 -- PRZYCISKI
 btn.MouseButton1Click:Connect(function()
