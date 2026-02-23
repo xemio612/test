@@ -1,55 +1,52 @@
+local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
--- USTAWIENIA
+-- Ustawienia
 _G.AutoFarmRunning = true
 _G.AutoFarmActive = false
 local currentSpeed = 20
+local currentTween = nil
+local currentTarget = nil
 
 -- GUI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = game.CoreGui
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 ScreenGui.Name = "MM2_Pro_Hub"
 
-local MainFrame = Instance.new("Frame")
+local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 200, 0, 250)
 MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-
 Instance.new("UICorner", MainFrame)
 
-local Title = Instance.new("TextLabel")
+local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.Text = "MM2 FARMER PRO"
 Title.TextColor3 = Color3.new(1,1,1)
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+Title.BackgroundColor3 = Color3.fromRGB(45,45,50)
 Title.Font = Enum.Font.SourceSansBold
-Title.Parent = MainFrame
 
-local ToggleBtn = Instance.new("TextButton")
+local ToggleBtn = Instance.new("TextButton", MainFrame)
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
 ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
 ToggleBtn.Text = "START FARM"
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(60,180,60)
 ToggleBtn.TextColor3 = Color3.new(1,1,1)
-ToggleBtn.Parent = MainFrame
 
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 20, 0, 20)
-CloseBtn.Position = UDim2.new(0.85, 0, 0.02, 0)
+local CloseBtn = Instance.new("TextButton", MainFrame)
+CloseBtn.Size = UDim2.new(0,20,0,20)
+CloseBtn.Position = UDim2.new(0.85,0,0.02,0)
 CloseBtn.Text = "X"
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseBtn.Parent = MainFrame
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
 
--- NOCLIP
+-- Noclip
 RunService.Stepped:Connect(function()
 	if _G.AutoFarmActive and player.Character then
-		for _, p in pairs(player.Character:GetDescendants()) do
+		for _,p in pairs(player.Character:GetDescendants()) do
 			if p:IsA("BasePart") then
 				p.CanCollide = false
 			end
@@ -57,18 +54,17 @@ RunService.Stepped:Connect(function()
 	end
 end)
 
--- ANTY GRAWITACJA
+-- Anty-grawitacja
 local function setGravity(state)
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
 	if state then
 		if not root:FindFirstChild("AntiFall") then
-			local bv = Instance.new("BodyVelocity")
+			local bv = Instance.new("BodyVelocity", root)
 			bv.Name = "AntiFall"
+			bv.MaxForce = Vector3.new(0, math.huge, 0)
 			bv.Velocity = Vector3.zero
-			bv.MaxForce = Vector3.new(0, 1e6, 0)
-			bv.Parent = root
 		end
 	else
 		if root:FindFirstChild("AntiFall") then
@@ -77,14 +73,14 @@ local function setGravity(state)
 	end
 end
 
--- NAJBLIŻSZY COIN
+-- Szukanie najbliższego coina
 local function getClosestCoin()
 	local char = player.Character
 	local root = char and char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
+	if not root then return nil end
 
 	local closest, dist = nil, math.huge
-	for _, v in pairs(workspace:GetDescendants()) do
+	for _,v in pairs(workspace:GetDescendants()) do
 		if (v.Name == "Coin" or v.Name == "Coin_Server") and v:IsA("BasePart") then
 			local d = (root.Position - v.Position).Magnitude
 			if d < dist then
@@ -96,22 +92,45 @@ local function getClosestCoin()
 	return closest
 end
 
--- RUCH CO KLATKĘ (ZERO CZEKAŃ)
-RunService.Heartbeat:Connect(function(dt)
-	if not _G.AutoFarmActive then return end
+-- Główna pętla (bez czekania na tween)
+task.spawn(function()
+	while _G.AutoFarmRunning do
+		if _G.AutoFarmActive then
+			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if root then
+				local newTarget = getClosestCoin()
 
-	local char = player.Character
-	local root = char and char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
+				if newTarget ~= currentTarget then
+					currentTarget = newTarget
+					if currentTween then
+						currentTween:Cancel()
+						currentTween = nil
+					end
 
-	local coin = getClosestCoin()
-	if not coin or not coin.Parent then return end
+					if currentTarget then
+						local dist = (root.Position - currentTarget.Position).Magnitude
+						local duration = dist / currentSpeed
+						currentTween = TweenService:Create(
+							root,
+							TweenInfo.new(duration, Enum.EasingStyle.Linear),
+							{CFrame = currentTarget.CFrame}
+						)
+						currentTween:Play()
+					end
+				end
 
-	local dir = (coin.Position - root.Position)
-	if dir.Magnitude < 1 then return end
-
-	local move = dir.Unit * currentSpeed * dt
-	root.CFrame = CFrame.new(root.Position + move, coin.Position)
+				-- coin zniknął = natychmiast anuluj
+				if currentTarget and not currentTarget.Parent then
+					if currentTween then
+						currentTween:Cancel()
+						currentTween = nil
+					end
+					currentTarget = nil
+				end
+			end
+		end
+		task.wait(0.03)
+	end
 end)
 
 -- UI
@@ -119,14 +138,13 @@ ToggleBtn.MouseButton1Click:Connect(function()
 	_G.AutoFarmActive = not _G.AutoFarmActive
 	setGravity(_G.AutoFarmActive)
 	ToggleBtn.Text = _G.AutoFarmActive and "STOP FARM" or "START FARM"
-	ToggleBtn.BackgroundColor3 = _G.AutoFarmActive
-		and Color3.fromRGB(180, 60, 60)
-		or Color3.fromRGB(60, 180, 60)
+	ToggleBtn.BackgroundColor3 = _G.AutoFarmActive and Color3.fromRGB(180,60,60) or Color3.fromRGB(60,180,60)
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
 	_G.AutoFarmRunning = false
 	_G.AutoFarmActive = false
 	setGravity(false)
+	if currentTween then currentTween:Cancel() end
 	ScreenGui:Destroy()
 end)
