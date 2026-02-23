@@ -1,94 +1,139 @@
-local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
-_G.Active = false
-_G.Running = true -- Zmienna do całkowitego stopu pętli
-local speed = 21
-local ignored = {}
+-- Ustawienia
+_G.AutoFarmRunning = true
+_G.AutoFarmActive = false
+_G.Noclip = false
+local currentSpeed = 20
 
--- 1. USUWANIE STARYCH WERSJI
-if player.PlayerGui:FindFirstChild("SimpleFarm") then player.PlayerGui.SimpleFarm:Destroy() end
+-- BIBLIOTEKA GUI (PROSTY PANEL)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.Name = "MM2_Pro_Hub"
 
--- 2. STWORZENIE GUI
-local sg = Instance.new("ScreenGui")
-sg.Name = "SimpleFarm"
-sg.Parent = player:WaitForChild("PlayerGui")
-sg.ResetOnSpawn = false
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 250)
+MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
--- GŁÓWNY PRZYCISK
-local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0, 150, 0, 50)
-btn.Position = UDim2.new(0.5, -75, 0.05, 0)
-btn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-btn.Text = "AUTO-FARM: OFF"
-btn.TextColor3 = Color3.new(1, 1, 1)
-btn.Font = Enum.Font.SourceSansBold
-btn.TextSize = 18
-btn.Parent = sg
-Instance.new("UICorner", btn)
+local UICorner = Instance.new("UICorner")
+UICorner.Parent = MainFrame
 
--- PRZYCISK X (ZAMKNIJ)
-local close = Instance.new("TextButton")
-close.Size = UDim2.new(0, 25, 0, 25)
-close.Position = UDim2.new(0.5, 85, 0.05, 0) -- Tuż obok przycisku farmy
-close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-close.Text = "X"
-close.TextColor3 = Color3.new(1, 1, 1)
-close.Parent = sg
-Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "MM2 FARMER PRO"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = MainFrame
 
--- 3. NOCLIP
+-- PRZYCISK TOGGLE
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
+ToggleBtn.Text = "START FARM"
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Parent = MainFrame
+
+-- PRZYCISK ZAMKNIĘCIA (X)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 20, 0, 20)
+CloseBtn.Position = UDim2.new(0.85, 0, 0.02, 0)
+CloseBtn.Text = "X"
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Parent = MainFrame
+
+-- STATUS SPEED
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(1, 0, 0, 20)
+SpeedLabel.Position = UDim2.new(0, 0, 0.45, 0)
+SpeedLabel.Text = "Speed: 20 studs/s"
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.Parent = MainFrame
+
+-- LOGIKA NOCLIP (Przenikanie przez ściany)
 RunService.Stepped:Connect(function()
-    if _G.Active and player.Character then
+    if _G.AutoFarmActive and player.Character then
         for _, part in pairs(player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
         end
     end
 end)
 
--- 4. PĘTLA RUCHU
-task.spawn(function()
-    while _G.Running do -- Pętla działa tylko dopóki nie klikniesz X
-        if _G.Active then
-            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-            local target = nil
-            local dist = math.huge
-            
-            for _, v in pairs(workspace:GetDescendants()) do
-                if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignored[v] then
-                    local d = (root.Position - v.Position).Magnitude
-                    if d < dist then dist = d; target = v end
-                end
+-- LOGIKA ANTY-GRAWITACJI (Żeby nie spadać)
+local function setGravity(state)
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if root then
+        if state then
+            local bp = Instance.new("BodyVelocity")
+            bp.Name = "AntiFall"
+            bp.Velocity = Vector3.new(0, 0, 0)
+            bp.MaxForce = Vector3.new(0, 400000, 0)
+            bp.Parent = root
+        else
+            if root:FindFirstChild("AntiFall") then
+                root.AntiFall:Destroy()
             end
-            
+        end
+    end
+end
+
+-- FUNKCJA SZUKANIA MONET
+local function getClosestCoin()
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    local closest, dist = nil, math.huge
+    for _, v in pairs(workspace:GetDescendants()) do
+        if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") then
+            local d = (root.Position - v.Position).Magnitude
+            if d < dist then dist = d; closest = v end
+        end
+    end
+    return closest
+end
+
+-- GŁÓWNA PĘTLA
+task.spawn(function()
+    while _G.AutoFarmRunning do
+        if _G.AutoFarmActive then
+            local target = getClosestCoin()
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
             if target and root then
-                local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
+                local duration = (root.Position - target.Position).Magnitude / currentSpeed
+                local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
                 tween:Play()
                 
-                repeat task.wait() until not target or not target.Parent or not _G.Active or (root.Position - target.Position).Magnitude < 3
-                
-                if target then ignored[target] = true end
+                repeat task.wait() until not target or not target.Parent or not _G.AutoFarmActive
                 tween:Cancel()
-            else
-                ignored = {}
-                task.wait(0.5)
             end
         end
-        task.wait()
+        task.wait(0.1)
     end
 end)
 
--- 5. OBSŁUGA PRZYCISKÓW
-btn.MouseButton1Click:Connect(function()
-    _G.Active = not _G.Active
-    btn.Text = _G.Active and "AUTO-FARM: ON" or "AUTO-FARM: OFF"
-    btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
+-- OBSŁUGA INTERFEJSU
+ToggleBtn.MouseButton1Click:Connect(function()
+    _G.AutoFarmActive = not _G.AutoFarmActive
+    setGravity(_G.AutoFarmActive)
+    ToggleBtn.Text = _G.AutoFarmActive and "STOP FARM" or "START FARM"
+    ToggleBtn.BackgroundColor3 = _G.AutoFarmActive and Color3.fromRGB(180, 60, 60) or Color3.fromRGB(60, 180, 60)
 end)
 
-close.MouseButton1Click:Connect(function()
-    _G.Active = false
-    _G.Running = false -- To zabija pętlę w tle
-    sg:Destroy() -- Usuwa GUI
+CloseBtn.MouseButton1Click:Connect(function()
+    _G.AutoFarmRunning = false
+    _G.AutoFarmActive = false
+    setGravity(false)
+    ScreenGui:Destroy()
 end)
