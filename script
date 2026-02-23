@@ -4,11 +4,11 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 _G.Active = false
-_G.Running = true 
-local speed = 22 -- Lekko podkręcona prędkość, wciąż bezpieczna
+_G.Running = true 
+local speed = 22 -- Prędkość (22 jest idealna, żeby nie wywalało)
 local ignored = {}
 
--- GUI (Bez zmian)
+-- GUI
 if player.PlayerGui:FindFirstChild("FastFarm") then player.PlayerGui.FastFarm:Destroy() end
 local sg = Instance.new("ScreenGui")
 sg.Name = "FastFarm"
@@ -35,73 +35,71 @@ close.TextColor3 = Color3.new(1, 1, 1)
 close.Parent = sg
 Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
 
--- NOCLIP (Kluczowy dla płynności)
+-- NOCLIP
 RunService.Stepped:Connect(function()
-    if _G.Active and player.Character then
-        for _, v in pairs(player.Character:GetDescendants()) do
-            if v:IsA("BasePart") then v.CanCollide = false end
-        end
-    end
+    if _G.Active and player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
 end)
 
--- LOGIKA RUCHU "IDEALNE ZAHACZENIE"
+-- LOGIKA RUCHU (BEZ OPÓŹNIEŃ)
 task.spawn(function()
-    while _G.Running do
-        if _G.Active then
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            
-            if root then
-                local target = nil
-                local dist = math.huge
-                
-                -- Szukanie celu (Skrócenie ścieżki przeszukiwania dla optymalizacji)
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignored[v] then
-                        local d = (root.Position - v.Position).Magnitude
-                        if d < dist then dist = d; target = v end
-                    end
-                end
-                
-                if target then
-                    -- KLUCZOWA ZMIANA: Celujemy dokładnie w środek monety (lub 0.5 unita pod nią), 
-                    -- aby nogi i korpus na pewno przeszły przez jej hitbox.
-                    local targetPos = target.CFrame * CFrame.new(0, 3, 0) 
-                    
-                    local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = targetPos})
-                    tween:Play()
-                    
-                    -- KLUCZ DO PŁYNNOŚCI:
-                    -- Zmniejszamy dystans do 0.5 unita. 
-                    -- Postać praktycznie "zlewa się" z monetą przed przejściem do następnej.
-                    while target and target.Parent and _G.Active and (root.Position - target.Position).Magnitude > 0.8 do
-                        task.wait()
-                    end
-                    
-                    ignored[target] = true
-                    -- Nie przerywamy tweena gwałtownie, jeśli nie trzeba, 
-                    -- ale tutaj robimy to, by natychmiast obrać nowy kurs.
-                    tween:Cancel() 
-                else
-                    ignored = {}
-                    task.wait(0.05) -- Oddech dla CPU, gdy nie ma monet
-                end
-            end
-        end
-        task.wait()
-    end
+    while _G.Running do
+        if _G.Active then
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if root then
+                local target = nil
+                local dist = math.huge
+                
+                -- Szukanie celu
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignored[v] then
+                        local d = (root.Position - v.Position).Magnitude
+                        if d < dist then dist = d; target = v end
+                    end
+                end
+                
+                if target then
+                    -- Obliczanie pozycji (nogi dotykają monety)
+                    -- Przesuwamy CFrame o 3 unity w górę, żeby nogi zahaczyły o monetę
+                    local targetPos = target.CFrame * CFrame.new(0, 3, 0)
+                    
+                    local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = targetPos})
+                    tween:Play()
+                    
+                    -- KLUCZ DO PŁYNNOŚCI:
+                    -- Czekamy aż będziemy BARDZO blisko, ale nie idealnie w środku (4 unity)
+                    while target and target.Parent and _G.Active and (root.Position - target.Position).Magnitude > 2 do
+                        task.wait()
+                    end
+                    
+                    -- Zapisujemy monetę jako zebraną i NATYCHMIAST szukamy nowej
+                    ignored[target] = true
+                    tween:Cancel() -- Przerywamy tween, żeby nie było "wyhamowania"
+                else
+                    ignored = {}
+                    task.wait(0.1) -- Bardzo krótka pauza jeśli mapa pusta
+                end
+            end
+        end
+        task.wait()
+    end
 end)
 
--- OBSŁUGA PRZYCISKÓW
+-- OBSŁUGA
 btn.MouseButton1Click:Connect(function()
-    _G.Active = not _G.Active
-    btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
-    btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
-    if _G.Active then ignored = {} end
+    _G.Active = not _G.Active
+    btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
+    btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
+    if _G.Active then ignored = {} end
 end)
 
 close.MouseButton1Click:Connect(function()
-    _G.Active = false
-    _G.Running = false
-    sg:Destroy()
+    _G.Active = false
+    _G.Running = false
+    sg:Destroy()
 end)
