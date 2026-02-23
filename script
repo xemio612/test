@@ -9,8 +9,9 @@ _G.AutoReset = false
 
 local speed = 22
 local ignored = {}
-local noCoinTime = 0
-local RESET_DELAY = 3 -- sekundy bez coinów zanim resetnie
+
+local lastCoinTime = os.clock()
+local RESET_AFTER = 10 -- sekund bez zebrania coina
 
 -- GUI
 if player.PlayerGui:FindFirstChild("FastFarm") then
@@ -64,39 +65,19 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- SPRAWDZANIE CZY SĄ COINY
-local function anyCoinsVisible()
-    for _,v in pairs(workspace:GetDescendants()) do
-        if (v.Name == "Coin" or v.Name == "Coin_Server")
-        and v:IsA("BasePart") then
-            if v.Transparency < 0.9 and v.CanTouch then
-                return true
-            end
-        end
-    end
-    return false
-end
-
--- AUTO RESET GDY BRAK COINÓW
+-- AUTO RESET: 10s BEZ COINA
 task.spawn(function()
     while _G.Running do
-        if _G.AutoReset and _G.Active then
-            if not anyCoinsVisible() then
-                noCoinTime += 0.5
-                if noCoinTime >= RESET_DELAY then
-                    local char = player.Character
-                    local hum = char and char:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        hum.Health = 0
-                        noCoinTime = 0
-                        task.wait(2)
-                    end
+        if _G.Active and _G.AutoReset then
+            if os.clock() - lastCoinTime >= RESET_AFTER then
+                local char = player.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.Health = 0
+                    lastCoinTime = os.clock()
+                    task.wait(2)
                 end
-            else
-                noCoinTime = 0
             end
-        else
-            noCoinTime = 0
         end
         task.wait(0.5)
     end
@@ -116,7 +97,9 @@ task.spawn(function()
                 for _,v in pairs(workspace:GetDescendants()) do
                     if (v.Name == "Coin" or v.Name == "Coin_Server")
                     and v:IsA("BasePart")
-                    and not ignored[v] then
+                    and not ignored[v]
+                    and v.Transparency < 0.9
+                    and v.CanTouch then
                         local d = (root.Position - v.Position).Magnitude
                         if d < dist then
                             dist = d
@@ -141,7 +124,9 @@ task.spawn(function()
                         task.wait()
                     end
 
+                    -- COIN ZEBRANY
                     ignored[target] = true
+                    lastCoinTime = os.clock()
                     tween:Cancel()
                 else
                     ignored = {}
@@ -159,6 +144,7 @@ btn.MouseButton1Click:Connect(function()
     btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
     btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50,150,50) or Color3.fromRGB(150,50,50)
     ignored = {}
+    lastCoinTime = os.clock()
 end)
 
 resetBtn.MouseButton1Click:Connect(function()
