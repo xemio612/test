@@ -142,7 +142,7 @@ task.spawn(function()
                         ignored[target] = true
 
                         -- 5. teleport do void
-                        root.CFrame = CFrame.new(0, -500, 0)
+                        root.CFrame = CFrame.new(0, 80, 0)
 
                         -- 6. przygotowanie następnego (pętla i tak go złapie)
                         if nextTarget then
