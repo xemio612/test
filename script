@@ -84,7 +84,7 @@ task.spawn(function()
                     tween:Cancel() 
                 else
                     ignored = {}
-                    task.wait(0.5) -- Oddech dla CPU, gdy nie ma monet
+                    task.wait(0.05) -- Oddech dla CPU, gdy nie ma monet
                 end
             end
         end
