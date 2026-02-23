@@ -5,13 +5,14 @@ local player = Players.LocalPlayer
 
 _G.Active = false
 _G.Running = true
-_G.AutoReset = true -- <<<<< AUTO RESET ON/OFF
-local speed = 22
+_G.AutoReset = false
+
+local speed = 22 -- bezpieczna prędkość
 local ignored = {}
 
 -- GUI
 if player.PlayerGui:FindFirstChild("FastFarm") then
-	player.PlayerGui.FastFarm:Destroy()
+    player.PlayerGui.FastFarm:Destroy()
 end
 
 local sg = Instance.new("ScreenGui")
@@ -30,22 +31,21 @@ btn.TextSize = 18
 btn.Parent = sg
 Instance.new("UICorner", btn)
 
--- AUTO RESET BUTTON
 local resetBtn = Instance.new("TextButton")
-resetBtn.Size = UDim2.new(0, 160, 0, 35)
-resetBtn.Position = UDim2.new(0.5, -80, 0.05, 50)
-resetBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-resetBtn.Text = "RESET: ON"
+resetBtn.Size = UDim2.new(0, 160, 0, 45)
+resetBtn.Position = UDim2.new(0.5, -80, 0.05, 55)
+resetBtn.BackgroundColor3 = Color3.fromRGB(120,120,120)
+resetBtn.Text = "AUTO RESET: OFF"
 resetBtn.TextColor3 = Color3.new(1,1,1)
 resetBtn.Font = Enum.Font.SourceSansBold
-resetBtn.TextSize = 16
+resetBtn.TextSize = 18
 resetBtn.Parent = sg
 Instance.new("UICorner", resetBtn)
 
 local close = Instance.new("TextButton")
 close.Size = UDim2.new(0, 25, 0, 25)
 close.Position = UDim2.new(0.5, 90, 0.05, 0)
-close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+close.BackgroundColor3 = Color3.fromRGB(200,0,0)
 close.Text = "X"
 close.TextColor3 = Color3.new(1,1,1)
 close.Parent = sg
@@ -53,106 +53,121 @@ Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
 
 -- NOCLIP
 RunService.Stepped:Connect(function()
-	if _G.Active and player.Character then
-		for _, v in pairs(player.Character:GetDescendants()) do
-			if v:IsA("BasePart") then
-				v.CanCollide = false
-			end
-		end
-	end
+    if _G.Active and player.Character then
+        for _,v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+    end
 end)
 
--- SPRAWDZANIE BAGA MM2
-local function isBagFull()
-	local data = player:FindFirstChild("PlayerGui")
-		and player.PlayerGui:FindFirstChild("MainGUI")
-		and player.PlayerGui.MainGUI:FindFirstChild("Game")
-		and player.PlayerGui.MainGUI.Game:FindFirstChild("Bag")
-		and player.PlayerGui.MainGUI.Game.Bag:FindFirstChild("Frame")
+-- SPRAWDZANIE COIN BAG (MM2)
+local function isCoinBagFull()
+    local gui = player:FindFirstChild("PlayerGui")
+    if not gui then return false end
 
-	if data and data:FindFirstChild("TextLabel") then
-		local text = data.TextLabel.Text -- np. "40/40"
-		local cur, max = text:match("(%d+)%s*/%s*(%d+)")
-		if cur and max then
-			return tonumber(cur) >= tonumber(max)
-		end
-	end
-	return false
+    local main = gui:FindFirstChild("MainGUI")
+    if not main then return false end
+
+    local gameGui = main:FindFirstChild("Game")
+    if not gameGui then return false end
+
+    local bag = gameGui:FindFirstChild("CoinBag")
+    if not bag then return false end
+
+    local container = bag:FindFirstChild("Container")
+    if not container then return false end
+
+    local amount = container:FindFirstChild("Amount")
+    local max = container:FindFirstChild("Max")
+    if not amount or not max then return false end
+
+    return tonumber(amount.Text) >= tonumber(max.Text)
 end
 
--- LOGIKA RUCHU
+-- AUTO RESET LOOP
 task.spawn(function()
-	while _G.Running do
-		if _G.Active then
-			if _G.AutoReset and isBagFull() then
-				local hum = player.Character and player.Character:FindFirstChild("Humanoid")
-				if hum then
-					hum:ChangeState(Enum.HumanoidStateType.Dead)
-					ignored = {}
-					task.wait(3)
-				end
-			end
+    while _G.Running do
+        if _G.AutoReset and isCoinBagFull() then
+            local char = player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.Health = 0
+                task.wait(2)
+            end
+        end
+        task.wait(0.5)
+    end
+end)
 
-			local char = player.Character
-			local root = char and char:FindFirstChild("HumanoidRootPart")
-			if root then
-				local target, dist = nil, math.huge
+-- LOGIKA FARMU
+task.spawn(function()
+    while _G.Running do
+        if _G.Active then
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
 
-				for _, v in pairs(workspace:GetDescendants()) do
-					if (v.Name == "Coin_Server" or v.Name == "Coin")
-						and v:IsA("BasePart")
-						and not ignored[v] then
+            if root then
+                local target = nil
+                local dist = math.huge
 
-						local d = (root.Position - v.Position).Magnitude
-						if d < dist then
-							dist = d
-							target = v
-						end
-					end
-				end
+                for _,v in pairs(workspace:GetDescendants()) do
+                    if (v.Name == "Coin" or v.Name == "Coin_Server")
+                    and v:IsA("BasePart")
+                    and not ignored[v] then
+                        local d = (root.Position - v.Position).Magnitude
+                        if d < dist then
+                            dist = d
+                            target = v
+                        end
+                    end
+                end
 
-				if target then
-					local targetPos = target.CFrame * CFrame.new(0, 3, 0)
-					local tween = TweenService:Create(
-						root,
-						TweenInfo.new(dist / speed, Enum.EasingStyle.Linear),
-						{CFrame = targetPos}
-					)
-					tween:Play()
+                if target then
+                    local targetPos = target.CFrame * CFrame.new(0,3,0)
+                    local tween = TweenService:Create(
+                        root,
+                        TweenInfo.new(dist/speed, Enum.EasingStyle.Linear),
+                        {CFrame = targetPos}
+                    )
+                    tween:Play()
 
-					while target and target.Parent and _G.Active
-						and (root.Position - target.Position).Magnitude > 3 do
-						task.wait()
-					end
+                    while target
+                    and target.Parent
+                    and _G.Active
+                    and (root.Position - target.Position).Magnitude > 3 do
+                        task.wait()
+                    end
 
-					ignored[target] = true
-					tween:Cancel()
-				else
-					ignored = {}
-					task.wait(0.1)
-				end
-			end
-		end
-		task.wait()
-	end
+                    ignored[target] = true
+                    tween:Cancel()
+                else
+                    ignored = {}
+                    task.wait(0.1)
+                end
+            end
+        end
+        task.wait()
+    end
 end)
 
 -- OBSŁUGA PRZYCISKÓW
 btn.MouseButton1Click:Connect(function()
-	_G.Active = not _G.Active
-	btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
-	btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50,150,50) or Color3.fromRGB(150,50,50)
-	if _G.Active then ignored = {} end
+    _G.Active = not _G.Active
+    btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
+    btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50,150,50) or Color3.fromRGB(150,50,50)
+    if _G.Active then ignored = {} end
 end)
 
 resetBtn.MouseButton1Click:Connect(function()
-	_G.AutoReset = not _G.AutoReset
-	resetBtn.Text = _G.AutoReset and "RESET: ON" or "RESET: OFF"
-	resetBtn.BackgroundColor3 = _G.AutoReset and Color3.fromRGB(50,150,50) or Color3.fromRGB(150,50,50)
+    _G.AutoReset = not _G.AutoReset
+    resetBtn.Text = _G.AutoReset and "AUTO RESET: ON" or "AUTO RESET: OFF"
+    resetBtn.BackgroundColor3 = _G.AutoReset and Color3.fromRGB(50,150,50) or Color3.fromRGB(120,120,120)
 end)
 
 close.MouseButton1Click:Connect(function()
-	_G.Active = false
-	_G.Running = false
-	sg:Destroy()
+    _G.Active = false
+    _G.Running = false
+    sg:Destroy()
 end)
