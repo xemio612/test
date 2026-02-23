@@ -11,112 +11,95 @@ _G.FlySpeed = 20
 _G.Running = true
 local ignoredCoins = {}
 
--- STWORZENIE INTERFEJSU
+-- USUWANIE POPRZEDNICH WERSJI (żeby się nie nakładały)
+local oldUI = player.PlayerGui:FindFirstChild("CustomMM2_Hub")
+if oldUI then oldUI:Destroy() end
+
+-- STWORZENIE INTERFEJSU (Zmienione na PlayerGui)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "CustomMM2_Hub"
-ScreenGui.Parent = game.CoreGui
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false -- Ważne: GUI nie zniknie po śmierci
 
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.Parent = ScreenGui
 Main.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-Main.Position = UDim2.new(0.3, 0, 0.3, 0)
+Main.Position = UDim2.new(0.5, -110, 0.5, -140) -- ŚRODEK EKRANU
 Main.Size = UDim2.new(0, 220, 0, 280)
 Main.Active = true
-Main.Draggable = true -- Możesz przesuwać okno
+Main.Draggable = true 
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10)
 UICorner.Parent = Main
 
 local Title = Instance.new("TextLabel")
-Title.Name = "Title"
 Title.Parent = Main
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-Title.Text = "MM2 CUSTOM HUB"
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+Title.Text = "MM2 FIX HUB"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.Parent = Title
+Instance.new("UICorner", Title)
 
 local Close = Instance.new("TextButton")
-Close.Name = "Close"
 Close.Parent = Main
 Close.Position = UDim2.new(0.85, 0, 0.02, 0)
 Close.Size = UDim2.new(0, 25, 0, 25)
 Close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 Close.Text = "X"
 Close.TextColor3 = Color3.fromRGB(255, 255, 255)
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(1, 0)
-CloseCorner.Parent = Close
+Instance.new("UICorner", Close).CornerRadius = UDim.new(1, 0)
 
--- PRZYCISK: AUTO FARM
-local FarmBtn = Instance.new("TextButton")
-FarmBtn.Parent = Main
-FarmBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
-FarmBtn.Size = UDim2.new(0.8, 0, 0, 35)
-FarmBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-FarmBtn.Text = "AUTO-FARM: OFF"
-FarmBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-FarmBtn.Font = Enum.Font.Gotham
-Instance.new("UICorner", FarmBtn)
+-- PRZYCISKI
+local function createBtn(text, pos)
+    local btn = Instance.new("TextButton")
+    btn.Parent = Main
+    btn.Position = pos
+    btn.Size = UDim2.new(0.8, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Gotham
+    Instance.new("UICorner", btn)
+    return btn
+end
 
--- PRZYCISK: AUTO RESET
-local ResetBtn = Instance.new("TextButton")
-ResetBtn.Parent = Main
-ResetBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
-ResetBtn.Size = UDim2.new(0.8, 0, 0, 35)
-ResetBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-ResetBtn.Text = "AUTO-RESET: OFF"
-ResetBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-ResetBtn.Font = Enum.Font.Gotham
-Instance.new("UICorner", ResetBtn)
+local FarmBtn = createBtn("START FARM", UDim2.new(0.1, 0, 0.2, 0))
+local ResetBtn = createBtn("AUTO-RESET: OFF", UDim2.new(0.1, 0, 0.35, 0))
 
--- SUWAK PRĘDKOŚCI
-local SliderTitle = Instance.new("TextLabel")
-SliderTitle.Parent = Main
-SliderTitle.Position = UDim2.new(0.1, 0, 0.55, 0)
-SliderTitle.Size = UDim2.new(0.8, 0, 0, 20)
-SliderTitle.BackgroundTransparency = 1
-SliderTitle.Text = "Speed: 20 studs/s"
-SliderTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-SliderTitle.Font = Enum.Font.Gotham
+-- SUWAK
+local SliderLabel = Instance.new("TextLabel")
+SliderLabel.Parent = Main
+SliderLabel.Position = UDim2.new(0, 0, 0.55, 0)
+SliderLabel.Size = UDim2.new(1, 0, 0, 20)
+SliderLabel.BackgroundTransparency = 1
+SliderLabel.Text = "Speed: 20 studs/s"
+SliderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 
 local SliderBack = Instance.new("Frame")
 SliderBack.Parent = Main
 SliderBack.Position = UDim2.new(0.1, 0, 0.65, 0)
 SliderBack.Size = UDim2.new(0.8, 0, 0, 6)
-SliderBack.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+SliderBack.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
 
 local SliderDot = Instance.new("TextButton")
 SliderDot.Parent = SliderBack
 SliderDot.Size = UDim2.new(0, 15, 0, 15)
 SliderDot.Position = UDim2.new(0.5, -7, -0.7, 0)
-SliderDot.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+SliderDot.BackgroundColor3 = Color3.fromRGB(120, 150, 255)
 SliderDot.Text = ""
 Instance.new("UICorner", SliderDot)
 
 -- LOGIKA NOCLIP
 RunService.Stepped:Connect(function()
     if _G.FarmActive and player.Character then
-        for _, part in pairs(player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
         end
     end
 end)
-
--- LOGIKA SPRAWDZANIA WORKA
-local function isFull()
-    local gui = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("MainGui")
-    if gui and gui:FindFirstChild("Game") and gui.Game:FindFirstChild("CoinBackpack") then
-        return gui.Game.CoinBackpack:FindFirstChild("Full") and gui.Game.CoinBackpack.Full.Visible
-    end
-    return false
-end
 
 -- LOGIKA SZUKANIA MONET
 local function getCoin()
@@ -132,15 +115,10 @@ local function getCoin()
     return closest
 end
 
--- PĘTLA GŁÓWNA
+-- PĘTLA
 task.spawn(function()
     while _G.Running do
         if _G.FarmActive then
-            if _G.AutoReset and isFull() then
-                if player.Character then player.Character:BreakJoints() end
-                task.wait(5)
-            end
-            
             local target = getCoin()
             local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
             if target and root then
@@ -151,7 +129,7 @@ task.spawn(function()
                 if target then ignoredCoins[target] = true end
                 tween:Cancel()
             else
-                ignoredCoins = {} -- Resetuj listę gdy pusto
+                ignoredCoins = {}
                 task.wait(1)
             end
         end
@@ -159,28 +137,27 @@ task.spawn(function()
     end
 end)
 
--- OBSŁUGA PRZYCISKÓW I SUWAKA
+-- OBSŁUGA
 FarmBtn.MouseButton1Click:Connect(function()
     _G.FarmActive = not _G.FarmActive
-    FarmBtn.Text = _G.FarmActive and "AUTO-FARM: ON" or "AUTO-FARM: OFF"
-    FarmBtn.BackgroundColor3 = _G.FarmActive and Color3.fromRGB(60, 150, 60) or Color3.fromRGB(50, 50, 55)
+    FarmBtn.Text = _G.FarmActive and "STOP FARM" or "START FARM"
+    FarmBtn.BackgroundColor3 = _G.FarmActive and Color3.fromRGB(60, 150, 60) or Color3.fromRGB(50, 50, 60)
 end)
 
 ResetBtn.MouseButton1Click:Connect(function()
     _G.AutoReset = not _G.AutoReset
     ResetBtn.Text = _G.AutoReset and "AUTO-RESET: ON" or "AUTO-RESET: OFF"
-    ResetBtn.BackgroundColor3 = _G.AutoReset and Color3.fromRGB(60, 100, 150) or Color3.fromRGB(50, 50, 55)
 end)
 
-local dragSlider = false
-SliderDot.MouseButton1Down:Connect(function() dragSlider = true end)
-UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragSlider = false end end)
+local dragging = false
+SliderDot.MouseButton1Down:Connect(function() dragging = true end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 UserInputService.InputChanged:Connect(function(input)
-    if dragSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local pos = math.clamp((input.Position.X - SliderBack.AbsolutePosition.X) / SliderBack.AbsoluteSize.X, 0, 1)
         SliderDot.Position = UDim2.new(pos, -7, -0.7, 0)
-        _G.FlySpeed = 15 + (pos * 10) -- 15 do 25
-        SliderTitle.Text = "Speed: " .. math.floor(_G.FlySpeed) .. " studs/s"
+        _G.FlySpeed = 15 + (pos * 10)
+        SliderLabel.Text = "Speed: " .. math.floor(_G.FlySpeed) .. " studs/s"
     end
 end)
 
@@ -189,3 +166,5 @@ Close.MouseButton1Click:Connect(function()
     _G.FarmActive = false
     ScreenGui:Destroy()
 end)
+
+print("MM2 Hub załadowany pomyślnie!")
