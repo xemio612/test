@@ -103,22 +103,16 @@ task.spawn(function()
                         
                         tween:Cancel()
                     else
-                        -- TELEPORT KROKOWY (22 studs/s)
-                        local start = root.Position
-                        local startTime = tick()
-                        
-                        while target and target.Parent and _G.Active do
-                            local alpha = (tick() - startTime) / travelTime
-                            if alpha >= 1 then break end
-                            
-                            root.CFrame = CFrame.new(
-                                start:Lerp(targetCF.Position, alpha)
-                            )
-                            RunService.Heartbeat:Wait()
-                        end
-                        
-                        root.CFrame = targetCF
-                    end
+                        else
+    -- PRAWDZIWY TELEPORT (czekamy = dystans / speed, potem jedno cięcie)
+    local waitTime = dist / speed
+
+    task.wait(waitTime)
+
+    if target and target.Parent and _G.Active then
+        root.CFrame = targetCF
+    end
+end
                     
                     ignored[target] = true
                 else
