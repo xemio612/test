@@ -1,176 +1,125 @@
-local Players = game:GetService("Players") 
+local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 
 _G.Active = false
-_G.AutoReset = false
-_G.Running = true 
-_G.Speed = 18 -- Domyślna prędkość na środku zakresu
+_G.Running = true
+
+local speed = 22
 local ignored = {}
 
+local touchCount = 0
+local TOUCH_LIMIT = 40
+
+-- RESET CHARACTER
+local function resetCharacter()
+    if player.Character then
+        player.Character:BreakJoints()
+        touchCount = 0
+        ignored = {}
+        task.wait(2)
+    end
+end
+
 -- GUI
-if player.PlayerGui:FindFirstChild("FastFarm") then player.PlayerGui.FastFarm:Destroy() end
+if player.PlayerGui:FindFirstChild("FastFarm") then
+    player.PlayerGui.FastFarm:Destroy()
+end
+
 local sg = Instance.new("ScreenGui")
 sg.Name = "FastFarm"
 sg.Parent = player:WaitForChild("PlayerGui")
 sg.ResetOnSpawn = false
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 180, 0, 180)
-mainFrame.Position = UDim2.new(0.5, -90, 0.05, 0)
-mainFrame.BackgroundTransparency = 1
-mainFrame.Parent = sg
-
 local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(1, 0, 0, 40)
-btn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+btn.Size = UDim2.new(0,160,0,45)
+btn.Position = UDim2.new(0.5,-80,0.05,0)
+btn.BackgroundColor3 = Color3.fromRGB(150,50,50)
 btn.Text = "FARM: OFF"
-btn.TextColor3 = Color3.new(1, 1, 1)
+btn.TextColor3 = Color3.new(1,1,1)
 btn.Font = Enum.Font.SourceSansBold
 btn.TextSize = 18
-btn.Parent = mainFrame
-Instance.new("UICorner", btn)
-
-local resetBtn = Instance.new("TextButton")
-resetBtn.Size = UDim2.new(1, 0, 0, 30)
-resetBtn.Position = UDim2.new(0, 0, 0, 45)
-resetBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-resetBtn.Text = "AUTO-RESET: OFF"
-resetBtn.TextColor3 = Color3.new(1, 1, 1)
-resetBtn.Font = Enum.Font.SourceSans
-resetBtn.TextSize = 14
-resetBtn.Parent = mainFrame
-Instance.new("UICorner", resetBtn)
-
--- SUWAK (SLIDER)
-local sliderFrame = Instance.new("Frame")
-sliderFrame.Size = UDim2.new(1, 0, 0, 35)
-sliderFrame.Position = UDim2.new(0, 0, 0, 80)
-sliderFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-sliderFrame.Parent = mainFrame
-Instance.new("UICorner", sliderFrame)
-
-local sliderLabel = Instance.new("TextLabel")
-sliderLabel.Size = UDim2.new(1, 0, 0, 15)
-sliderLabel.BackgroundTransparency = 1
-sliderLabel.Text = "SPEED: " .. _G.Speed
-sliderLabel.TextColor3 = Color3.new(1, 1, 1)
-sliderLabel.TextSize = 12
-sliderLabel.Parent = sliderFrame
-
-local sliderBar = Instance.new("Frame")
-sliderBar.Size = UDim2.new(0.8, 0, 0, 4)
-sliderBar.Position = UDim2.new(0.1, 0, 0.7, 0)
-sliderBar.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-sliderBar.Parent = sliderFrame
-
-local sliderDot = Instance.new("Frame")
-sliderDot.Size = UDim2.new(0, 12, 0, 12)
-sliderDot.AnchorPoint = Vector2.new(0.5, 0.5)
-sliderDot.Position = UDim2.new(0.5, 0, 0.5, 0) -- Start na środku
-sliderDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-sliderDot.Parent = sliderBar
-Instance.new("UICorner", sliderDot)
-
--- PODPIS
-local credits = Instance.new("TextLabel")
-credits.Size = UDim2.new(1, 0, 0, 20)
-credits.Position = UDim2.new(0, 0, 0, 120)
-credits.BackgroundTransparency = 1
-credits.Text = "BY: xemio612"
-credits.TextColor3 = Color3.fromRGB(200, 200, 200)
-credits.Font = Enum.Font.Code
-credits.TextSize = 14
-credits.Parent = mainFrame
+btn.Parent = sg
+Instance.new("UICorner",btn)
 
 local close = Instance.new("TextButton")
-close.Size = UDim2.new(0, 20, 0, 20)
-close.Position = UDim2.new(1, 5, 0, 0)
-close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+close.Size = UDim2.new(0,25,0,25)
+close.Position = UDim2.new(0.5,90,0.05,0)
+close.BackgroundColor3 = Color3.fromRGB(200,0,0)
 close.Text = "X"
-close.TextColor3 = Color3.new(1, 1, 1)
-close.Parent = mainFrame
-Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
+close.TextColor3 = Color3.new(1,1,1)
+close.Parent = sg
+Instance.new("UICorner",close).CornerRadius = UDim.new(1,0)
 
--- LOGIKA SUWAKA
-local dragging = false
-sliderDot.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-end)
-RunService.RenderStepped:Connect(function()
-    if dragging then
-        local mousePos = UserInputService:GetMouseLocation().X
-        local barPos = sliderBar.AbsolutePosition.X
-        local barWidth = sliderBar.AbsoluteSize.X
-        local percent = math.clamp((mousePos - barPos) / barWidth, 0, 1)
-        sliderDot.Position = UDim2.new(percent, 0, 0.5, 0)
-        _G.Speed = math.floor(15 + (percent * (22 - 15)))
-        sliderLabel.Text = "SPEED: " .. _G.Speed
-    end
-end)
-
--- LOGIKA SPRAWDZANIA TORBY
-local function isBagFull()
-    local mainGui = player.PlayerGui:FindFirstChild("MainGui")
-    if mainGui and mainGui:FindFirstChild("Game") then
-        local coinContainer = mainGui.Game:FindFirstChild("CoinContainer")
-        if coinContainer then
-            local bagText = coinContainer:FindFirstChild("Bag")
-            if bagText then
-                local current, max = bagText.Text:match("(%d+)/(%d+)")
-                if current and max then return tonumber(current) >= tonumber(max) end
-            end
-        end
-    end
-    return false
-end
+local sign = Instance.new("TextLabel")
+sign.Size = UDim2.new(0,160,0,20)
+sign.Position = UDim2.new(0.5,-80,0.12,0)
+sign.BackgroundTransparency = 1
+sign.Text = "BY: xemio612"
+sign.TextColor3 = Color3.fromRGB(200,200,200)
+sign.TextSize = 14
+sign.Font = Enum.Font.SourceSansItalic
+sign.Parent = sg
 
 -- NOCLIP
 RunService.Stepped:Connect(function()
     if _G.Active and player.Character then
-        for _, v in pairs(player.Character:GetDescendants()) do
-            if v:IsA("BasePart") then v.CanCollide = false end
+        for _,v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
         end
     end
 end)
 
--- FARMING LOOP
+-- FARM LOGIC
 task.spawn(function()
     while _G.Running do
         if _G.Active then
-            if _G.AutoReset and isBagFull() then
-                if player.Character and player.Character:FindFirstChild("Humanoid") then
-                    player.Character.Humanoid.Health = 0
-                    task.wait(5)
-                end
-            end
-
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
+
             if root then
                 local target = nil
                 local dist = math.huge
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignored[v] then
+
+                for _,v in pairs(workspace:GetDescendants()) do
+                    if (v.Name == "Coin" or v.Name == "Coin_Server")
+                        and v:IsA("BasePart")
+                        and not ignored[v] then
+
                         local d = (root.Position - v.Position).Magnitude
-                        if d < dist then dist = d; target = v end
+                        if d < dist then
+                            dist = d
+                            target = v
+                        end
                     end
                 end
-                
+
                 if target then
-                    local targetPos = target.CFrame * CFrame.new(0, 3, 0)
-                    local tween = TweenService:Create(root, TweenInfo.new(dist/_G.Speed, Enum.EasingStyle.Linear), {CFrame = targetPos})
+                    local tween = TweenService:Create(
+                        root,
+                        TweenInfo.new(dist/speed, Enum.EasingStyle.Linear),
+                        {CFrame = target.CFrame * CFrame.new(0,3,0)}
+                    )
                     tween:Play()
-                    while target and target.Parent and _G.Active and (root.Position - target.Position).Magnitude > 3 do
+
+                    -- czekamy aż FAKTYCZNIE DOTKNIE
+                    while target
+                        and target.Parent
+                        and _G.Active
+                        and (root.Position - target.Position).Magnitude > 3 do
                         task.wait()
                     end
-                    ignored[target] = true
+
                     tween:Cancel()
+                    ignored[target] = true
+                    touchCount += 1
+
+                    if touchCount >= TOUCH_LIMIT then
+                        resetCharacter()
+                    end
                 else
                     ignored = {}
                     task.wait(0.1)
@@ -181,18 +130,18 @@ task.spawn(function()
     end
 end)
 
--- OBSŁUGA PRZYCISKÓW
+-- BUTTONS
 btn.MouseButton1Click:Connect(function()
     _G.Active = not _G.Active
     btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
-    btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
-    if _G.Active then ignored = {} end
-end)
+    btn.BackgroundColor3 = _G.Active
+        and Color3.fromRGB(50,150,50)
+        or Color3.fromRGB(150,50,50)
 
-resetBtn.MouseButton1Click:Connect(function()
-    _G.AutoReset = not _G.AutoReset
-    resetBtn.Text = _G.AutoReset and "AUTO-RESET: ON" or "AUTO-RESET: OFF"
-    resetBtn.BackgroundColor3 = _G.AutoReset and Color3.fromRGB(50, 100, 150) or Color3.fromRGB(80, 80, 80)
+    if _G.Active then
+        ignored = {}
+        touchCount = 0
+    end
 end)
 
 close.MouseButton1Click:Connect(function()
