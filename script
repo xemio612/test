@@ -30,14 +30,16 @@ local currentCharacter = nil
 
 local function onCharacterAdded(char)
     currentCharacter = char
-    ignored = {}
-    _G.Active = false -- wyłącz farmę po resecie
+    ignored = {} -- czyścimy stare targety
+    -- nie wyłączamy farmy (_G.Active zostaje taki jak był)
+    -- aktualizujemy GUI przy respawnie tylko jeśli jest włączone
     if player.PlayerGui:FindFirstChild("FastFarm") then
         local gui = player.PlayerGui.FastFarm
         local btn = gui:FindFirstChild("TextButton")
         if btn then
-            btn.Text = "FARM: OFF"
-            btn.BackgroundColor3 = Color3.fromRGB(150,50,50)
+            btn.BackgroundColor3 = _G.Active
+                and Color3.fromRGB(50,150,50)
+                or Color3.fromRGB(150,50,50)
         end
     end
 end
@@ -143,7 +145,7 @@ task.spawn(function()
                         ignored[target] = true
                         tween:Cancel()
                     else
-                        -- TELEPORT BEZ BŁĘDU PO RESECIE
+                        -- TELEPORT
                         local travelTime = dist / speed
                         local startChar = currentCharacter
 
