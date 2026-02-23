@@ -11,8 +11,8 @@ local speed = 22 -- studs / second
 local ignored = {}
 
 -- GUI
-if player.PlayerGui:FindFirstChild("FastFarm") then
-    player.PlayerGui.FastFarm:Destroy()
+if player.PlayerGui:FindFirstChild("FastFarm") then 
+    player.PlayerGui.FastFarm:Destroy() 
 end
 
 local sg = Instance.new("ScreenGui")
@@ -55,29 +55,27 @@ Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
 RunService.Stepped:Connect(function()
     if _G.Active and player.Character then
         for _, v in pairs(player.Character:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.CanCollide = false
+            if v:IsA("BasePart") then 
+                v.CanCollide = false 
             end
         end
     end
 end)
 
--- LOGIKA FARMU
+-- RUCH
 task.spawn(function()
     while _G.Running do
         if _G.Active then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
-
+            
             if root then
-                local target = nil
-                local dist = math.huge
-
-                -- szukanie najbliższego coina
+                local target, dist = nil, math.huge
+                
                 for _, v in pairs(workspace:GetDescendants()) do
                     if (v.Name == "Coin_Server" or v.Name == "Coin")
-                        and v:IsA("BasePart")
-                        and not ignored[v] then
+                    and v:IsA("BasePart")
+                    and not ignored[v] then
                         local d = (root.Position - v.Position).Magnitude
                         if d < dist then
                             dist = d
@@ -85,28 +83,26 @@ task.spawn(function()
                         end
                     end
                 end
-
+                
                 if target then
                     local targetCF = target.CFrame * CFrame.new(0, 3, 0)
-
+                    local travelTime = dist / speed
+                    
                     if _G.UseTween then
-                        -- TWEEN
                         local tween = TweenService:Create(
                             root,
-                            TweenInfo.new(dist / speed, Enum.EasingStyle.Linear),
+                            TweenInfo.new(travelTime, Enum.EasingStyle.Linear),
                             {CFrame = targetCF}
                         )
                         tween:Play()
-
+                        
                         while target and target.Parent and _G.Active
-                            and (root.Position - target.Position).Magnitude > 3 do
+                        and (root.Position - target.Position).Magnitude > 3 do
                             task.wait()
                         end
-
-                        ignored[target] = true
+                        
                         tween:Cancel()
                     else
-                        
     -- PRAWDZIWY TELEPORT (czekamy = dystans / speed, potem jedno cięcie)
     local waitTime = dist / speed
 
@@ -124,9 +120,7 @@ btn.MouseButton1Click:Connect(function()
     btn.BackgroundColor3 = _G.Active
         and Color3.fromRGB(50, 150, 50)
         or Color3.fromRGB(150, 50, 50)
-    if _G.Active then
-        ignored = {}
-    end
+    if _G.Active then ignored = {} end
 end)
 
 modeBtn.MouseButton1Click:Connect(function()
@@ -134,7 +128,7 @@ modeBtn.MouseButton1Click:Connect(function()
     modeBtn.Text = _G.UseTween and "MODE: TWEEN" or "MODE: TELEPORT"
     modeBtn.BackgroundColor3 = _G.UseTween
         and Color3.fromRGB(60, 60, 160)
-        or Color3.fromRGB(160, 60, 255)
+        or Color3.fromRGB(160, 60, 60)
 end)
 
 close.MouseButton1Click:Connect(function()
