@@ -1,5 +1,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
 local player = Players.LocalPlayer
 
 _G.Active = false
@@ -7,15 +9,6 @@ _G.Running = true
 
 local speed = 22
 local ignored = {}
-
--- RESET CHARACTER
-local function resetCharacter()
-    if player.Character then
-        player.Character:BreakJoints()
-        ignored = {}
-        task.wait(2)
-    end
-end
 
 -- GUI
 if player.PlayerGui:FindFirstChild("FastFarm") then
@@ -47,7 +40,7 @@ close.Text = "X"
 close.TextColor3 = Color3.new(1,1,1)
 Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
 
--- SPEED SLIDER
+-- SPEED SLIDER (15–25)
 local sliderBg = Instance.new("Frame", sg)
 sliderBg.Size = UDim2.new(0,160,0,8)
 sliderBg.Position = UDim2.new(0.5,-80,0.13,0)
@@ -62,36 +55,40 @@ Instance.new("UICorner", slider)
 local dragging = false
 
 sliderBg.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+    end
 end)
 
 sliderBg.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
 end)
 
 RunService.RenderStepped:Connect(function()
     if dragging then
-        local mouseX = game:GetService("UserInputService"):GetMouseLocation().X
+        local mouseX = UserInputService:GetMouseLocation().X
         local x = math.clamp(
             (mouseX - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X,
-            0,1
+            0, 1
         )
         slider.Size = UDim2.new(x,0,1,0)
-        speed = math.floor(15 + (25-15)*x)
+        speed = math.floor(15 + (25 - 15) * x)
     end
 end)
 
 -- WARNING
 local warn = Instance.new("TextLabel", sg)
-warn.Size = UDim2.new(0,220,0,30)
-warn.Position = UDim2.new(0.5,-110,0.16,0)
+warn.Size = UDim2.new(0,240,0,30)
+warn.Position = UDim2.new(0.5,-120,0.16,0)
 warn.BackgroundTransparency = 1
 warn.Text = "Warning: Speed above 22 may kick you"
 warn.TextColor3 = Color3.fromRGB(255,120,120)
 warn.Font = Enum.Font.SourceSans
 warn.TextSize = 14
 
--- SIGN
+-- SIGNATURE
 local sign = Instance.new("TextLabel", sg)
 sign.Size = UDim2.new(0,160,0,20)
 sign.Position = UDim2.new(0.5,-80,0.20,0)
@@ -112,21 +109,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- FULL BAG DETECTION
-task.spawn(function()
-    while _G.Running do
-        for _,gui in pairs(player.PlayerGui:GetDescendants()) do
-            if gui:IsA("TextLabel") and gui.Text then
-                if string.lower(gui.Text):find("full") then
-                    resetCharacter()
-                end
-            end
-        end
-        task.wait(0.3)
-    end
-end)
-
--- TELEPORT FARM LOGIC
+-- TELEPORT FARM (DYNAMIC SPEED)
 task.spawn(function()
     while _G.Running do
         if _G.Active then
@@ -150,10 +133,11 @@ task.spawn(function()
                 end
 
                 if target then
+                    -- teleport directly to coin
                     root.CFrame = target.CFrame * CFrame.new(0,3,0)
                     ignored[target] = true
 
-                    -- im bliżej, tym szybciej
+                    -- closer = faster
                     local delayTime = math.clamp(dist / speed, 0.05, 1)
                     task.wait(delayTime)
                 else
@@ -173,7 +157,10 @@ btn.MouseButton1Click:Connect(function()
     btn.BackgroundColor3 = _G.Active
         and Color3.fromRGB(50,150,50)
         or Color3.fromRGB(150,50,50)
-    if _G.Active then ignored = {} end
+
+    if _G.Active then
+        ignored = {}
+    end
 end)
 
 close.MouseButton1Click:Connect(function()
