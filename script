@@ -103,7 +103,7 @@ task.spawn(function()
                         
                         tween:Cancel()
                     else
-                       else
+                       
     -- TELEPORT: czekamy zgodnie z dystansem
     local waitTime = dist / speed
     task.wait(waitTime)
