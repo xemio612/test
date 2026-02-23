@@ -1,21 +1,19 @@
--- SERVICES
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-
 local player = Players.LocalPlayer
 
--- GLOBAL FLAGS
+-- =======================
+-- USTAWIENIA
+-- =======================
 _G.AutoFarmRunning = true
 _G.AutoFarmActive = false
+_G.Noclip = false
+local currentSpeed = 22
 
--- STAŁA PRĘDKOŚĆ
-local SPEED = 20 -- studs / sekunda
-local currentTween = nil
-
-------------------------------------------------
+-- =======================
 -- GUI
-------------------------------------------------
+-- =======================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = game.CoreGui
 ScreenGui.Name = "MM2_Pro_Hub"
@@ -29,13 +27,13 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
-Instance.new("UICorner", MainFrame)
+local UICorner = Instance.new("UICorner", MainFrame)
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.Text = "MM2 FARMER PRO"
 Title.TextColor3 = Color3.new(1,1,1)
-Title.BackgroundColor3 = Color3.fromRGB(45,45,50)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 Title.Font = Enum.Font.SourceSansBold
 Title.Parent = MainFrame
 
@@ -43,145 +41,151 @@ local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
 ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
 ToggleBtn.Text = "START FARM"
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(60,180,60)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
 ToggleBtn.TextColor3 = Color3.new(1,1,1)
 ToggleBtn.Parent = MainFrame
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0,20,0,20)
-CloseBtn.Position = UDim2.new(0.85,0,0.02,0)
+CloseBtn.Size = UDim2.new(0, 20, 0, 20)
+CloseBtn.Position = UDim2.new(0.85, 0, 0.02, 0)
 CloseBtn.Text = "X"
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 CloseBtn.Parent = MainFrame
 
 local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Size = UDim2.new(1,0,0,20)
-SpeedLabel.Position = UDim2.new(0,0,0.45,0)
-SpeedLabel.Text = "Speed: 20 studs/s"
+SpeedLabel.Size = UDim2.new(1, 0, 0, 20)
+SpeedLabel.Position = UDim2.new(0, 0, 0.45, 0)
+SpeedLabel.Text = "Speed: 22 studs/s"
 SpeedLabel.BackgroundTransparency = 1
-SpeedLabel.TextColor3 = Color3.fromRGB(200,200,200)
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 SpeedLabel.Parent = MainFrame
 
-------------------------------------------------
+-- =======================
 -- NOCLIP
-------------------------------------------------
+-- =======================
 RunService.Stepped:Connect(function()
-	if _G.AutoFarmActive and player.Character then
-		for _,v in pairs(player.Character:GetDescendants()) do
-			if v:IsA("BasePart") then
-				v.CanCollide = false
-			end
-		end
-	end
+    if _G.AutoFarmActive and player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
 end)
 
-------------------------------------------------
--- ANTI FALL
-------------------------------------------------
+-- =======================
+-- ANTY GRAWITACJA
+-- =======================
 local function setGravity(state)
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if not root then return end
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
 
-	if state then
-		if not root:FindFirstChild("AntiFall") then
-			local bv = Instance.new("BodyVelocity")
-			bv.Name = "AntiFall"
-			bv.MaxForce = Vector3.new(0, 500000, 0)
-			bv.Velocity = Vector3.zero
-			bv.Parent = root
-		end
-	else
-		if root:FindFirstChild("AntiFall") then
-			root.AntiFall:Destroy()
-		end
-	end
+    if state then
+        if not root:FindFirstChild("AntiFall") then
+            local bv = Instance.new("BodyVelocity")
+            bv.Name = "AntiFall"
+            bv.Velocity = Vector3.zero
+            bv.MaxForce = Vector3.new(0, 500000, 0)
+            bv.Parent = root
+        end
+    else
+        local af = root:FindFirstChild("AntiFall")
+        if af then af:Destroy() end
+    end
 end
 
-------------------------------------------------
--- COIN FINDER
-------------------------------------------------
-local function getClosestCoin()
-	local char = player.Character
-	local root = char and char:FindFirstChild("HumanoidRootPart")
-	if not root then return nil end
+-- =======================
+-- SZUKANIE NAJBLIŻSZEJ MONETY (z pominięciem ostatniej)
+-- =======================
+local lastCoin = nil
 
-	local closest
-	local dist = math.huge
+local function getClosestCoin(ignore)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
 
-	for _,v in pairs(workspace:GetDescendants()) do
-		if (v.Name == "Coin" or v.Name == "Coin_Server") and v:IsA("BasePart") then
-			local d = (root.Position - v.Position).Magnitude
-			if d < dist then
-				dist = d
-				closest = v
-			end
-		end
-	end
+    local closest, dist = nil, math.huge
 
-	return closest
+    for _, v in pairs(workspace:GetDescendants()) do
+        if (v.Name == "Coin" or v.Name == "Coin_Server")
+        and v:IsA("BasePart")
+        and v ~= ignore
+        and v.Parent then
+
+            local d = (root.Position - v.Position).Magnitude
+            if d < dist then
+                dist = d
+                closest = v
+            end
+        end
+    end
+
+    return closest
 end
 
-------------------------------------------------
--- SMOOTH MOVE
-------------------------------------------------
-local function moveToCoin(coin)
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if not root or not coin then return end
+-- =======================
+-- SUPER PŁYNNY TWEEN (OUT BACK)
+-- =======================
+local function tweenTo(pos)
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
 
-	if currentTween then
-		currentTween:Cancel()
-	end
+    local dist = (root.Position - pos).Magnitude
+    local time = dist / currentSpeed
 
-	local distance = (root.Position - coin.Position).Magnitude
-	local duration = distance / SPEED
+    local tween = TweenService:Create(
+        root,
+        TweenInfo.new(
+            time,
+            Enum.EasingStyle.Back,
+            Enum.EasingDirection.Out
+        ),
+        {CFrame = CFrame.new(pos)}
+    )
 
-	currentTween = TweenService:Create(
-		root,
-		TweenInfo.new(
-			duration,
-			Enum.EasingStyle.Quad,
-			Enum.EasingDirection.Out
-		),
-		{CFrame = coin.CFrame}
-	)
-
-	currentTween:Play()
+    tween:Play()
+    return tween
 end
 
-------------------------------------------------
--- MAIN LOOP (NATYCHMIASTOWE PRZEŁĄCZANIE COINÓW)
-------------------------------------------------
+-- =======================
+-- GŁÓWNA PĘTLA FARMU
+-- =======================
 task.spawn(function()
-	while _G.AutoFarmRunning do
-		if _G.AutoFarmActive then
-			local coin = getClosestCoin()
-			if coin then
-				moveToCoin(coin)
-			end
-		end
-		task.wait(0.05)
-	end
+    local currentTween = nil
+
+    while _G.AutoFarmRunning do
+        if _G.AutoFarmActive then
+            local coin = getClosestCoin(lastCoin)
+            if coin then
+                lastCoin = coin
+
+                if currentTween then
+                    currentTween:Cancel()
+                end
+
+                currentTween = tweenTo(coin.Position)
+            end
+        end
+        task.wait(0.15)
+    end
 end)
 
-------------------------------------------------
--- UI LOGIC
-------------------------------------------------
+-- =======================
+-- BUTTONY
+-- =======================
 ToggleBtn.MouseButton1Click:Connect(function()
-	_G.AutoFarmActive = not _G.AutoFarmActive
-	setGravity(_G.AutoFarmActive)
+    _G.AutoFarmActive = not _G.AutoFarmActive
+    setGravity(_G.AutoFarmActive)
 
-	ToggleBtn.Text = _G.AutoFarmActive and "STOP FARM" or "START FARM"
-	ToggleBtn.BackgroundColor3 = _G.AutoFarmActive and Color3.fromRGB(180,60,60) or Color3.fromRGB(60,180,60)
+    ToggleBtn.Text = _G.AutoFarmActive and "STOP FARM" or "START FARM"
+    ToggleBtn.BackgroundColor3 = _G.AutoFarmActive
+        and Color3.fromRGB(180, 60, 60)
+        or Color3.fromRGB(60, 180, 60)
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
-	_G.AutoFarmRunning = false
-	_G.AutoFarmActive = false
-	setGravity(false)
-
-	if currentTween then
-		currentTween:Cancel()
-	end
-
-	ScreenGui:Destroy()
+    _G.AutoFarmRunning = false
+    _G.AutoFarmActive = false
+    setGravity(false)
+    ScreenGui:Destroy()
 end)
