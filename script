@@ -4,102 +4,134 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 _G.Active = false
-_G.Running = true 
-local speed = 22 -- Prędkość (22 jest idealna, żeby nie wywalało)
+_G.AutoReset = false 
+_G.Running = true 
+local speed = 22
 local ignored = {}
 
--- GUI
+-- GUI Setup
 if player.PlayerGui:FindFirstChild("FastFarm") then player.PlayerGui.FastFarm:Destroy() end
-local sg = Instance.new("ScreenGui")
+local sg = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 sg.Name = "FastFarm"
-sg.Parent = player:WaitForChild("PlayerGui")
 sg.ResetOnSpawn = false
 
-local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0, 160, 0, 45)
-btn.Position = UDim2.new(0.5, -80, 0.05, 0)
-btn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-btn.Text = "FARM: OFF"
-btn.TextColor3 = Color3.new(1, 1, 1)
-btn.Font = Enum.Font.SourceSansBold
-btn.TextSize = 18
-btn.Parent = sg
-Instance.new("UICorner", btn)
+local function createBtn(name, pos, color)
+    local b = Instance.new("TextButton", sg)
+    b.Size = UDim2.new(0, 150, 0, 40)
+    b.Position = pos
+    b.BackgroundColor3 = color
+    b.Text = name
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.SourceSansBold
+    b.TextSize = 16
+    Instance.new("UICorner", b)
+    return b
+end
 
-local close = Instance.new("TextButton")
+local btn = createBtn("FARM: OFF", UDim2.new(0.5, -155, 0.05, 0), Color3.fromRGB(150, 50, 50))
+local rbtn = createBtn("RESET: OFF", UDim2.new(0.5, 5, 0.05, 0), Color3.fromRGB(150, 50, 50))
+
+local close = Instance.new("TextButton", sg)
 close.Size = UDim2.new(0, 25, 0, 25)
-close.Position = UDim2.new(0.5, 90, 0.05, 0)
-close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+close.Position = UDim2.new(0.5, 165, 0.05, 0)
+close.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 close.Text = "X"
 close.TextColor3 = Color3.new(1, 1, 1)
-close.Parent = sg
 Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
 
--- NOCLIP
+-- FUNKCJA SPRAWDZANIA STANU TORBY
+local function isBagFull()
+    local char = player.Character
+    local backpack = player:FindFirstChild("Backpack")
+    -- Szukanie kontenera w Backpack lub bezpośrednio w postaci
+    local container = (backpack and backpack:FindFirstChild("CoinContainer")) or (char and char:FindFirstChild("CoinContainer"))
+    
+    if container then
+        local loot = container:FindFirstChild("Loot")
+        local maxLoot = container:FindFirstChild("MaxLoot")
+        if loot and maxLoot and maxLoot.Value > 0 then
+            return loot.Value >= maxLoot.Value
+        end
+    end
+    return false
+end
+
+-- NOCLIP (Stały podczas pracy skryptu)
 RunService.Stepped:Connect(function()
-    if _G.Active and player.Character then
-        for _, v in pairs(player.Character:GetDescendants()) do
-            if v:IsA("BasePart") then v.CanCollide = false end
-        end
-    end
+    if _G.Active and player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
+        end
+    end
 end)
 
--- LOGIKA RUCHU (BEZ OPÓŹNIEŃ)
+-- GŁÓWNA PĘTLA
 task.spawn(function()
-    while _G.Running do
-        if _G.Active then
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            
-            if root then
-                local target = nil
-                local dist = math.huge
-                
-                -- Szukanie celu
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignored[v] then
-                        local d = (root.Position - v.Position).Magnitude
-                        if d < dist then dist = d; target = v end
-                    end
-                end
-                
-                if target then
-                    -- Obliczanie pozycji (nogi dotykają monety)
-                    -- Przesuwamy CFrame o 3 unity w górę, żeby nogi zahaczyły o monetę
-                    local targetPos = target.CFrame * CFrame.new(0, 3, 0)
-                    
-                    local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = targetPos})
-                    tween:Play()
-                    
-                    -- KLUCZ DO PŁYNNOŚCI:
-                    -- Czekamy aż będziemy BARDZO blisko, ale nie idealnie w środku (4 unity)
-                    while target and target.Parent and _G.Active and (root.Position - target.Position).Magnitude > 4 do
-                        task.wait()
-                    end
-                    
-                    -- Zapisujemy monetę jako zebraną i NATYCHMIAST szukamy nowej
-                    ignored[target] = true
-                    tween:Cancel() -- Przerywamy tween, żeby nie było "wyhamowania"
-                else
-                    ignored = {}
-                    task.wait(0.1) -- Bardzo krótka pauza jeśli mapa pusta
-                end
-            end
-        end
-        task.wait()
-    end
+    while _G.Running do
+        if _G.Active then
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChild("Humanoid")
+
+            -- Jeśli reset jest włączony i torba pełna - zabij postać
+            if _G.AutoReset and isBagFull() then
+                if hum and hum.Health > 0 then
+                    hum.Health = 0
+                    task.wait(3) -- Czas na odrodzenie i załadowanie torby
+                end
+            end
+
+            if root and hum and hum.Health > 0 then
+                local target = nil
+                local dist = math.huge
+                
+                -- Szukanie najbliższej monety
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignored[v] then
+                        local d = (root.Position - v.Position).Magnitude
+                        if d < dist then dist = d; target = v end
+                    end
+                end
+                
+                if target then
+                    local targetPos = target.CFrame * CFrame.new(0, 3, 0)
+                    local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = targetPos})
+                    tween:Play()
+                    
+                    -- Pętla sprawdzająca podczas lotu
+                    while target and target.Parent and _G.Active and (root.Position - target.Position).Magnitude > 3 do
+                        if _G.AutoReset and isBagFull() then break end 
+                        if not player.Character or not player.Character:FindFirstChild("Humanoid") or player.Character.Humanoid.Health <= 0 then break end
+                        task.wait()
+                    end
+                    
+                    ignored[target] = true
+                    tween:Cancel()
+                else
+                    ignored = {} -- Reset listy zignorowanych jeśli nie ma monet
+                    task.wait(1)
+                end
+            end
+        end
+        task.wait(0.1)
+    end
 end)
 
--- OBSŁUGA
+-- EVENTY
 btn.MouseButton1Click:Connect(function()
-    _G.Active = not _G.Active
-    btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
-    btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
-    if _G.Active then ignored = {} end
+    _G.Active = not _G.Active
+    btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
+    btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
+end)
+
+rbtn.MouseButton1Click:Connect(function()
+    _G.AutoReset = not _G.AutoReset
+    rbtn.Text = _G.AutoReset and "RESET: ON" or "RESET: OFF"
+    rbtn.BackgroundColor3 = _G.AutoReset and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
 end)
 
 close.MouseButton1Click:Connect(function()
-    _G.Active = false
-    _G.Running = false
-    sg:Destroy()
+    _G.Active = false
+    _G.Running = false
+    sg:Destroy()
 end)
