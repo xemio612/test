@@ -1,152 +1,94 @@
--- WYMUSZONE CZYSZCZENIE
-for _, v in pairs(game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):GetChildren()) do
-    if v.Name == "CustomMM2_Hub" then v:Destroy() end
-end
-
-local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 
--- Zmienne
-_G.FarmActive = false
-_G.AutoReset = false
-_G.FlySpeed = 20
-_G.Running = true
-local ignoredCoins = {}
+_G.Active = false
+_G.Running = true -- Zmienna do całkowitego stopu pętli
+local speed = 21
+local ignored = {}
 
--- GUI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "CustomMM2_Hub"
-ScreenGui.Parent = player:WaitForChild("PlayerGui")
-ScreenGui.DisplayOrder = 999 -- Sprawia, że będzie nad innymi GUI
-ScreenGui.ResetOnSpawn = false
+-- 1. USUWANIE STARYCH WERSJI
+if player.PlayerGui:FindFirstChild("SimpleFarm") then player.PlayerGui.SimpleFarm:Destroy() end
 
-local Main = Instance.new("Frame")
-Main.Name = "Main"
-Main.Parent = ScreenGui
-Main.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-Main.Position = UDim2.new(0.1, 0, 0.1, 0) -- Lewy górny róg (bezpieczniej)
-Main.Size = UDim2.new(0, 200, 0, 250)
-Main.Active = true
-Main.Draggable = true
+-- 2. STWORZENIE GUI
+local sg = Instance.new("ScreenGui")
+sg.Name = "SimpleFarm"
+sg.Parent = player:WaitForChild("PlayerGui")
+sg.ResetOnSpawn = false
 
--- Upiększenie (UICorner)
-local function round(obj)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 8)
-    c.Parent = obj
-end
-round(Main)
+-- GŁÓWNY PRZYCISK
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 150, 0, 50)
+btn.Position = UDim2.new(0.5, -75, 0.05, 0)
+btn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+btn.Text = "AUTO-FARM: OFF"
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 18
+btn.Parent = sg
+Instance.new("UICorner", btn)
 
-local Title = Instance.new("TextLabel")
-Title.Parent = Main
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-Title.Text = "MM2 HUB [FIXED]"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 16
-round(Title)
+-- PRZYCISK X (ZAMKNIJ)
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0, 25, 0, 25)
+close.Position = UDim2.new(0.5, 85, 0.05, 0) -- Tuż obok przycisku farmy
+close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+close.Text = "X"
+close.TextColor3 = Color3.new(1, 1, 1)
+close.Parent = sg
+Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
 
--- PRZYCISKI
-local FarmBtn = Instance.new("TextButton")
-FarmBtn.Parent = Main
-FarmBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
-FarmBtn.Size = UDim2.new(0.8, 0, 0, 40)
-FarmBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-FarmBtn.Text = "START FARM"
-FarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-round(FarmBtn)
-
-local ResetBtn = Instance.new("TextButton")
-ResetBtn.Parent = Main
-ResetBtn.Position = UDim2.new(0.1, 0, 0.4, 0)
-ResetBtn.Size = UDim2.new(0.8, 0, 0, 40)
-ResetBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-ResetBtn.Text = "AUTO-RESET: OFF"
-ResetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-round(ResetBtn)
-
-local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Parent = Main
-SpeedLabel.Position = UDim2.new(0, 0, 0.6, 0)
-SpeedLabel.Size = UDim2.new(1, 0, 0, 20)
-SpeedLabel.BackgroundTransparency = 1
-SpeedLabel.Text = "Speed: 20"
-SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-local Close = Instance.new("TextButton")
-Close.Parent = Main
-Close.Position = UDim2.new(0.8, 0, -0.05, 0)
-Close.Size = UDim2.new(0, 25, 0, 25)
-Close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-Close.Text = "X"
-Close.TextColor3 = Color3.fromRGB(255, 255, 255)
-round(Close)
-
--- LOGIKA NOCLIP
+-- 3. NOCLIP
 RunService.Stepped:Connect(function()
-    if _G.FarmActive and player.Character then
-        for _, v in pairs(player.Character:GetDescendants()) do
-            if v:IsA("BasePart") then v.CanCollide = false end
+    if _G.Active and player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
         end
     end
 end)
 
--- SZUKANIE MONET
-local function getCoin()
-    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
-    local closest, dist = nil, math.huge
-    for _, v in pairs(workspace:GetDescendants()) do
-        if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignoredCoins[v] then
-            local d = (root.Position - v.Position).Magnitude
-            if d < dist then dist = d; closest = v end
-        end
-    end
-    return closest
-end
-
--- PĘTLA
+-- 4. PĘTLA RUCHU
 task.spawn(function()
-    while _G.Running do
-        if _G.FarmActive then
-            local target = getCoin()
+    while _G.Running do -- Pętla działa tylko dopóki nie klikniesz X
+        if _G.Active then
             local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            local target = nil
+            local dist = math.huge
+            
+            for _, v in pairs(workspace:GetDescendants()) do
+                if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignored[v] then
+                    local d = (root.Position - v.Position).Magnitude
+                    if d < dist then dist = d; target = v end
+                end
+            end
+            
             if target and root then
-                local duration = (root.Position - target.Position).Magnitude / _G.FlySpeed
-                local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
+                local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
                 tween:Play()
-                repeat task.wait() until not target or not target.Parent or not _G.FarmActive or (root.Position - target.Position).Magnitude < 2.5
-                if target then ignoredCoins[target] = true end
+                
+                repeat task.wait() until not target or not target.Parent or not _G.Active or (root.Position - target.Position).Magnitude < 3
+                
+                if target then ignored[target] = true end
                 tween:Cancel()
             else
-                ignoredCoins = {}
-                task.wait(1)
+                ignored = {}
+                task.wait(0.5)
             end
         end
         task.wait()
     end
 end)
 
--- OBSŁUGA
-FarmBtn.MouseButton1Click:Connect(function()
-    _G.FarmActive = not _G.FarmActive
-    FarmBtn.Text = _G.FarmActive and "STOP FARM" or "START FARM"
-    FarmBtn.BackgroundColor3 = _G.FarmActive and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(45, 45, 55)
+-- 5. OBSŁUGA PRZYCISKÓW
+btn.MouseButton1Click:Connect(function()
+    _G.Active = not _G.Active
+    btn.Text = _G.Active and "AUTO-FARM: ON" or "AUTO-FARM: OFF"
+    btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
 end)
 
-ResetBtn.MouseButton1Click:Connect(function()
-    _G.AutoReset = not _G.AutoReset
-    ResetBtn.Text = _G.AutoReset and "AUTO-RESET: ON" or "AUTO-RESET: OFF"
+close.MouseButton1Click:Connect(function()
+    _G.Active = false
+    _G.Running = false -- To zabija pętlę w tle
+    sg:Destroy() -- Usuwa GUI
 end)
-
-Close.MouseButton1Click:Connect(function()
-    _G.Running = false
-    _G.FarmActive = false
-    ScreenGui:Destroy()
-end)
-
-warn("SKRYPT MM2 URUCHOMIONY!")
