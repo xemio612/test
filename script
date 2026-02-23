@@ -4,37 +4,39 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 _G.Active = false
-_G.Running = true 
-_G.AutoReset = false -- Nowa zmienna dla resetu
-local speed = 22 
+_G.Running = true
+_G.AutoReset = true -- <<<<< AUTO RESET ON/OFF
+local speed = 22
 local ignored = {}
 
 -- GUI
-if player.PlayerGui:FindFirstChild("FastFarm") then player.PlayerGui.FastFarm:Destroy() end
+if player.PlayerGui:FindFirstChild("FastFarm") then
+	player.PlayerGui.FastFarm:Destroy()
+end
+
 local sg = Instance.new("ScreenGui")
 sg.Name = "FastFarm"
 sg.Parent = player:WaitForChild("PlayerGui")
 sg.ResetOnSpawn = false
 
--- Przycisk FARM
 local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0, 160, 0, 40)
-btn.Position = UDim2.new(0.5, -170, 0.05, 0)
+btn.Size = UDim2.new(0, 160, 0, 45)
+btn.Position = UDim2.new(0.5, -80, 0.05, 0)
 btn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
 btn.Text = "FARM: OFF"
-btn.TextColor3 = Color3.new(1, 1, 1)
+btn.TextColor3 = Color3.new(1,1,1)
 btn.Font = Enum.Font.SourceSansBold
-btn.TextSize = 16
+btn.TextSize = 18
 btn.Parent = sg
 Instance.new("UICorner", btn)
 
--- Przycisk AUTO RESET
+-- AUTO RESET BUTTON
 local resetBtn = Instance.new("TextButton")
-resetBtn.Size = UDim2.new(0, 160, 0, 40)
-resetBtn.Position = UDim2.new(0.5, 0, 0.05, 0)
-resetBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-resetBtn.Text = "AUTO RESET: OFF"
-resetBtn.TextColor3 = Color3.new(1, 1, 1)
+resetBtn.Size = UDim2.new(0, 160, 0, 35)
+resetBtn.Position = UDim2.new(0.5, -80, 0.05, 50)
+resetBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+resetBtn.Text = "RESET: ON"
+resetBtn.TextColor3 = Color3.new(1,1,1)
 resetBtn.Font = Enum.Font.SourceSansBold
 resetBtn.TextSize = 16
 resetBtn.Parent = sg
@@ -42,102 +44,115 @@ Instance.new("UICorner", resetBtn)
 
 local close = Instance.new("TextButton")
 close.Size = UDim2.new(0, 25, 0, 25)
-close.Position = UDim2.new(0.5, 170, 0.05, 0)
+close.Position = UDim2.new(0.5, 90, 0.05, 0)
 close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
 close.Text = "X"
-close.TextColor3 = Color3.new(1, 1, 1)
+close.TextColor3 = Color3.new(1,1,1)
 close.Parent = sg
-Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
+Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
 
 -- NOCLIP
 RunService.Stepped:Connect(function()
-    if _G.Active and player.Character then
-        for _, v in pairs(player.Character:GetDescendants()) do
-            if v:IsA("BasePart") then v.CanCollide = false end
-        end
-    end
+	if _G.Active and player.Character then
+		for _, v in pairs(player.Character:GetDescendants()) do
+			if v:IsA("BasePart") then
+				v.CanCollide = false
+			end
+		end
+	end
 end)
 
--- FUNKCJA SPRAWDZANIA TORBY
+-- SPRAWDZANIE BAGA MM2
 local function isBagFull()
-    local coinData = player:FindFirstChild("CoinData")
-    if coinData then
-        local coins = coinData:FindFirstChild("Coins")
-        local maxCoins = coinData:FindFirstChild("MaxCoins") -- W MM2 zazwyczaj 40 lub 50
-        if coins and maxCoins then
-            return coins.Value >= maxCoins.Value
-        end
-    end
-    return false
+	local data = player:FindFirstChild("PlayerGui")
+		and player.PlayerGui:FindFirstChild("MainGUI")
+		and player.PlayerGui.MainGUI:FindFirstChild("Game")
+		and player.PlayerGui.MainGUI.Game:FindFirstChild("Bag")
+		and player.PlayerGui.MainGUI.Game.Bag:FindFirstChild("Frame")
+
+	if data and data:FindFirstChild("TextLabel") then
+		local text = data.TextLabel.Text -- np. "40/40"
+		local cur, max = text:match("(%d+)%s*/%s*(%d+)")
+		if cur and max then
+			return tonumber(cur) >= tonumber(max)
+		end
+	end
+	return false
 end
 
 -- LOGIKA RUCHU
 task.spawn(function()
-    while _G.Running do
-        if _G.Active then
-            -- Sprawdzanie Auto Resetu
-            if _G.AutoReset and isBagFull() then
-                if player.Character and player.Character:FindFirstChild("Humanoid") then
-                    player.Character.Humanoid.Health = 0
-                    _G.Active = false -- Wyłączamy farmę na chwilę, żeby nie świrowała podczas respawnu
-                    btn.Text = "FARM: OFF (RESPAWN)"
-                    task.wait(5) -- Czekamy na respawn
-                    _G.Active = true
-                    btn.Text = "FARM: ON"
-                end
-            end
+	while _G.Running do
+		if _G.Active then
+			if _G.AutoReset and isBagFull() then
+				local hum = player.Character and player.Character:FindFirstChild("Humanoid")
+				if hum then
+					hum:ChangeState(Enum.HumanoidStateType.Dead)
+					ignored = {}
+					task.wait(3)
+				end
+			end
 
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            
-            if root then
-                local target = nil
-                local dist = math.huge
-                
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignored[v] then
-                        local d = (root.Position - v.Position).Magnitude
-                        if d < dist then dist = d; target = v end
-                    end
-                end
-                
-                if target then
-                    local targetPos = target.CFrame * CFrame.new(0, 3, 0)
-                    local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = targetPos})
-                    tween:Play()
-                    
-                    while target and target.Parent and _G.Active and (root.Position - target.Position).Magnitude > 3 do
-                        task.wait()
-                    end
-                    
-                    ignored[target] = true
-                    tween:Cancel()
-                else
-                    ignored = {}
-                    task.wait(0.1)
-                end
-            end
-        end
-        task.wait()
-    end
+			local char = player.Character
+			local root = char and char:FindFirstChild("HumanoidRootPart")
+			if root then
+				local target, dist = nil, math.huge
+
+				for _, v in pairs(workspace:GetDescendants()) do
+					if (v.Name == "Coin_Server" or v.Name == "Coin")
+						and v:IsA("BasePart")
+						and not ignored[v] then
+
+						local d = (root.Position - v.Position).Magnitude
+						if d < dist then
+							dist = d
+							target = v
+						end
+					end
+				end
+
+				if target then
+					local targetPos = target.CFrame * CFrame.new(0, 3, 0)
+					local tween = TweenService:Create(
+						root,
+						TweenInfo.new(dist / speed, Enum.EasingStyle.Linear),
+						{CFrame = targetPos}
+					)
+					tween:Play()
+
+					while target and target.Parent and _G.Active
+						and (root.Position - target.Position).Magnitude > 3 do
+						task.wait()
+					end
+
+					ignored[target] = true
+					tween:Cancel()
+				else
+					ignored = {}
+					task.wait(0.1)
+				end
+			end
+		end
+		task.wait()
+	end
 end)
 
 -- OBSŁUGA PRZYCISKÓW
 btn.MouseButton1Click:Connect(function()
-    _G.Active = not _G.Active
-    btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
-    btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
-    if _G.Active then ignored = {} end
+	_G.Active = not _G.Active
+	btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
+	btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50,150,50) or Color3.fromRGB(150,50,50)
+	if _G.Active then ignored = {} end
 end)
 
 resetBtn.MouseButton1Click:Connect(function()
-    _G.AutoReset = not _G.AutoReset
-    resetBtn.Text = _G.AutoReset and "AUTO RESET: ON" or "AUTO RESET: OFF"
-    resetBtn.BackgroundColor3 = _G.AutoReset and Color3.fromRGB(50, 120, 150) or Color3.fromRGB(80, 80, 80)
+	_G.AutoReset = not _G.AutoReset
+	resetBtn.Text = _G.AutoReset and "RESET: ON" or "RESET: OFF"
+	resetBtn.BackgroundColor3 = _G.AutoReset and Color3.fromRGB(50,150,50) or Color3.fromRGB(150,50,50)
 end)
 
 close.MouseButton1Click:Connect(function()
-    _G.Active = false
-    _G.Running = false
-    sg:Destroy()
+	_G.Active = false
+	_G.Running = false
+	sg:Destroy()
 end)
