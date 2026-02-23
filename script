@@ -67,8 +67,11 @@ end)
 -- SPRAWDZANIE CZY SĄ COINY
 local function anyCoinsVisible()
     for _,v in pairs(workspace:GetDescendants()) do
-        if (v.Name == "Coin" or v.Name == "Coin_Server") and v:IsA("BasePart") then
-            return true
+        if (v.Name == "Coin" or v.Name == "Coin_Server")
+        and v:IsA("BasePart") then
+            if v.Transparency < 0.9 and v.CanTouch then
+                return true
+            end
         end
     end
     return false
