@@ -103,26 +103,50 @@ task.spawn(function()
                         
                         tween:Cancel()
                     else
-                       -- PRAWDZIWY TELEPORT (czekamy = dystans / speed, potem jedno cięcie)
+                       else
+    -- TELEPORT: czekamy zgodnie z dystansem
     local waitTime = dist / speed
-
     task.wait(waitTime)
 
-    if target and target.Parent and _G.Active then
-        root.CFrame = targetCF
-    end
-end
-                    
-                    ignored[target] = true
-                else
-                    ignored = {}
-                    task.wait(0.1)
+    if not (_G.Active and target and target.Parent) then return end
+
+    -- TELEPORT NA COIN
+    root.CFrame = targetCF
+
+    -- STOIMY NA COINIE 0.3s
+    local nextTarget = nil
+    local nextDist = math.huge
+    local startTick = tick()
+
+    while tick() - startTick < 0.3 do
+        -- wczytujemy NASTĘPNY coin będąc NA COINIE
+        for _, v in pairs(workspace:GetDescendants()) do
+            if (v.Name == "Coin_Server" or v.Name == "Coin")
+            and v:IsA("BasePart")
+            and not ignored[v]
+            and v ~= target then
+                local d = (root.Position - v.Position).Magnitude
+                if d < nextDist then
+                    nextDist = d
+                    nextTarget = v
                 end
             end
         end
         task.wait()
     end
-end)
+
+    -- oznaczamy aktualny coin jako zebrany
+    ignored[target] = true
+
+    -- TELEPORT DO VOID
+    root.CFrame = CFrame.new(0, -500, 0)
+
+    -- jeżeli znaleziono następny coin, ustawiamy go od razu
+    if nextTarget then
+        target = nextTarget
+        dist = nextDist
+    end
+end
 
 -- PRZYCISKI
 btn.MouseButton1Click:Connect(function()
