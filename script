@@ -1,136 +1,105 @@
-local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
--- Ustawienia
-_G.AutoFarmRunning = true
-_G.AutoFarmActive = false
-local currentSpeed = 20
-local ignoredCoins = {} -- Lista monet już zebranych/odwiedzonych
+_G.Active = false
+_G.Running = true 
+local speed = 22 -- Prędkość (22 jest idealna, żeby nie wywalało)
+local ignored = {}
 
--- GUI Library Setup
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = game.CoreGui
-ScreenGui.Name = "MM2_Flow_Hub"
+-- GUI
+if player.PlayerGui:FindFirstChild("FastFarm") then player.PlayerGui.FastFarm:Destroy() end
+local sg = Instance.new("ScreenGui")
+sg.Name = "FastFarm"
+sg.Parent = player:WaitForChild("PlayerGui")
+sg.ResetOnSpawn = false
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 200, 0, 180)
-MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame)
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 160, 0, 45)
+btn.Position = UDim2.new(0.5, -80, 0.05, 0)
+btn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+btn.Text = "FARM: OFF"
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 18
+btn.Parent = sg
+Instance.new("UICorner", btn)
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "MM2 FLOW FARMER"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-Title.Parent = MainFrame
-Instance.new("UICorner", Title)
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0, 25, 0, 25)
+close.Position = UDim2.new(0.5, 90, 0.05, 0)
+close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+close.Text = "X"
+close.TextColor3 = Color3.new(1, 1, 1)
+close.Parent = sg
+Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
 
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0.8, 0, 0, 45)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
-ToggleBtn.Text = "START FLOW"
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.Parent = MainFrame
-Instance.new("UICorner", ToggleBtn)
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 25, 0, 25)
-CloseBtn.Position = UDim2.new(0.85, -5, 0.05, 0)
-CloseBtn.Text = "X"
-CloseBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.Parent = MainFrame
-Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
-
--- NOCLIP & ANTI-GRAVITY
+-- NOCLIP
 RunService.Stepped:Connect(function()
-    if _G.AutoFarmActive and player.Character then
-        for _, part in pairs(player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
+    if _G.Active and player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
         end
     end
 end)
 
--- FUNKCJA SZUKANIA NAJBLIŻSZEJ, NIEZIGNOROWANEJ MONETY
-local function getNextTarget()
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
-    
-    local closest, minDist = nil, math.huge
-    
-    for _, v in pairs(workspace:GetDescendants()) do
-        -- Sprawdzamy nazwę i czy moneta nie jest na czarnej liście
-        if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignoredCoins[v] then
-            local d = (root.Position - v.Position).Magnitude
-            if d < minDist then
-                minDist = d
-                closest = v
-            end
-        end
-    end
-    return closest
-end
-
--- GŁÓWNA PĘTLA
+-- LOGIKA RUCHU (BEZ OPÓŹNIEŃ)
 task.spawn(function()
-    while _G.AutoFarmRunning do
-        if _G.AutoFarmActive then
-            local target = getNextTarget()
-            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    while _G.Running do
+        if _G.Active then
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
             
-            if target and root then
-                local dist = (root.Position - target.Position).Magnitude
-                local duration = dist / currentSpeed
+            if root then
+                local target = nil
+                local dist = math.huge
                 
-                local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
-                tween:Play()
-                
-                -- Czekaj aż dotrzesz bardzo blisko LUB moneta zniknie
-                repeat 
-                    task.wait() 
-                until not target or not target.Parent or not _G.AutoFarmActive or (root.Position - target.Position).Magnitude < 2.5
-                
-                -- Dodaj do ignorowanych, żeby nie wracać do tej samej monety w tej samej pętli
-                if target then
-                    ignoredCoins[target] = true
+                -- Szukanie celu
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignored[v] then
+                        local d = (root.Position - v.Position).Magnitude
+                        if d < dist then dist = d; target = v end
+                    end
                 end
                 
-                tween:Cancel()
-            else
-                -- Jeśli nie ma monet, wyczyść listę ignorowanych (może się zrespiły nowe)
-                ignoredCoins = {}
-                task.wait(1)
+                if target then
+                    -- Obliczanie pozycji (nogi dotykają monety)
+                    -- Przesuwamy CFrame o 3 unity w górę, żeby nogi zahaczyły o monetę
+                    local targetPos = target.CFrame * CFrame.new(0, 3, 0)
+                    
+                    local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = targetPos})
+                    tween:Play()
+                    
+                    -- KLUCZ DO PŁYNNOŚCI:
+                    -- Czekamy aż będziemy BARDZO blisko, ale nie idealnie w środku (4 unity)
+                    while target and target.Parent and _G.Active and (root.Position - target.Position).Magnitude > 4 do
+                        task.wait()
+                    end
+                    
+                    -- Zapisujemy monetę jako zebraną i NATYCHMIAST szukamy nowej
+                    ignored[target] = true
+                    tween:Cancel() -- Przerywamy tween, żeby nie było "wyhamowania"
+                else
+                    ignored = {}
+                    task.wait(0.1) -- Bardzo krótka pauza jeśli mapa pusta
+                end
             end
         end
         task.wait()
     end
 end)
 
--- OBSŁUGA PRZYCISKÓW
-ToggleBtn.MouseButton1Click:Connect(function()
-    _G.AutoFarmActive = not _G.AutoFarmActive
-    if _G.AutoFarmActive then
-        ToggleBtn.Text = "STOP FLOW"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-        ignoredCoins = {} -- Reset przy starcie
-    else
-        ToggleBtn.Text = "START FLOW"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-    end
+-- OBSŁUGA
+btn.MouseButton1Click:Connect(function()
+    _G.Active = not _G.Active
+    btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
+    btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
+    if _G.Active then ignored = {} end
 end)
 
-CloseBtn.MouseButton1Click:Connect(function()
-    _G.AutoFarmRunning = false
-    _G.AutoFarmActive = false
-    ScreenGui:Destroy()
+close.MouseButton1Click:Connect(function()
+    _G.Active = false
+    _G.Running = false
+    sg:Destroy()
 end)
