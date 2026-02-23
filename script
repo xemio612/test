@@ -1,30 +1,40 @@
--- lua script  
-
+-- lua script
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-
 local player = Players.LocalPlayer
 
-_G.Active = true          -- ZAWSZE AKTYWNY
+_G.Active = false
 _G.Running = true
-_G.UseTween = false       -- false = TELEPORT, true = TWEEN
-local speed = 22
+_G.UseTween = true -- true = tween, false = teleport
+local speed = 22 -- studs / second
 local ignored = {}
 
 -- ===== SPAWN =====
-local function getSpawnCFrame()
-    if player.RespawnLocation then
-        return player.RespawnLocation.CFrame + Vector3.new(0, 3, 0)
+local spawnCF = nil
+
+local function getSpawn()
+    if spawnCF then return spawnCF end
+
+    local spawnLocation = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
+    if spawnLocation then
+        spawnCF = spawnLocation.CFrame + Vector3.new(0, 3, 0)
+    elseif player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        spawnCF = player.Character.HumanoidRootPart.CFrame
+    else
+        spawnCF = CFrame.new(0, 10, 0)
     end
 
-    local spawn = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
-    if spawn then
-        return spawn.CFrame + Vector3.new(0, 3, 0)
-    end
-
-    return CFrame.new(0, 10, 0)
+    return spawnCF
 end
+
+player.CharacterAdded:Connect(function(char)
+    task.wait(1)
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if root then
+        spawnCF = root.CFrame
+    end
+end)
 
 -- ===== GUI =====
 if player.PlayerGui:FindFirstChild("FastFarm") then
@@ -37,32 +47,40 @@ sg.Parent = player:WaitForChild("PlayerGui")
 sg.ResetOnSpawn = false
 
 local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0, 180, 0, 45)
-btn.Position = UDim2.new(0.5, -90, 0.05, 0)
-btn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-btn.Text = "AUTOFARM: ON"
-btn.TextColor3 = Color3.new(1,1,1)
+btn.Size = UDim2.new(0, 160, 0, 45)
+btn.Position = UDim2.new(0.5, -80, 0.05, 0)
+btn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+btn.Text = "FARM: OFF"
+btn.TextColor3 = Color3.new(1, 1, 1)
 btn.Font = Enum.Font.SourceSansBold
 btn.TextSize = 18
 btn.Parent = sg
 Instance.new("UICorner", btn)
 
 local modeBtn = Instance.new("TextButton")
-modeBtn.Size = UDim2.new(0, 180, 0, 35)
-modeBtn.Position = UDim2.new(0.5, -90, 0.05, 50)
-modeBtn.BackgroundColor3 = Color3.fromRGB(160, 60, 60)
-modeBtn.Text = "MODE: TELEPORT"
-modeBtn.TextColor3 = Color3.new(1,1,1)
+modeBtn.Size = UDim2.new(0, 160, 0, 35)
+modeBtn.Position = UDim2.new(0.5, -80, 0.05, 50)
+modeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 160)
+modeBtn.Text = "MODE: TWEEN"
+modeBtn.TextColor3 = Color3.new(1, 1, 1)
 modeBtn.Font = Enum.Font.SourceSansBold
 modeBtn.TextSize = 16
 modeBtn.Parent = sg
 Instance.new("UICorner", modeBtn)
 
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0, 25, 0, 25)
+close.Position = UDim2.new(0.5, 90, 0.05, 0)
+close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+close.Text = "X"
+close.TextColor3 = Color3.new(1, 1, 1)
+close.Parent = sg
+Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
+
 -- ===== NOCLIP =====
 RunService.Stepped:Connect(function()
-    local char = player.Character
-    if char then
-        for _, v in pairs(char:GetDescendants()) do
+    if _G.Active and player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
             if v:IsA("BasePart") then
                 v.CanCollide = false
             end
@@ -70,11 +88,20 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ===== AUTOFARM =====
+-- ===== FARM =====
 task.spawn(function()
     while _G.Running do
-        local char = player.Character or player.CharacterAdded:Wait()
-        local root = char:WaitForChild("HumanoidRootPart")
+        task.wait()
+
+        if not _G.Active then
+            continue
+        end
+
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then
+            continue
+        end
 
         local target, dist = nil, math.huge
 
@@ -82,6 +109,7 @@ task.spawn(function()
             if (v.Name == "Coin_Server" or v.Name == "Coin")
                 and v:IsA("BasePart")
                 and not ignored[v] then
+
                 local d = (root.Position - v.Position).Magnitude
                 if d < dist then
                     dist = d
@@ -90,58 +118,72 @@ task.spawn(function()
             end
         end
 
-        if target then
-            local targetCF = target.CFrame * CFrame.new(0, 3, 0)
-
-            if _G.UseTween then
-                local tween = TweenService:Create(
-                    root,
-                    TweenInfo.new(dist / speed, Enum.EasingStyle.Linear),
-                    {CFrame = targetCF}
-                )
-                tween:Play()
-
-                while target and target.Parent
-                    and (root.Position - target.Position).Magnitude > 3 do
-                    task.wait()
-                end
-
-                tween:Cancel()
-                ignored[target] = true
-            else
-                -- TELEPORT LOGICZNY
-                task.wait(dist / speed)
-
-                if target and target.Parent then
-                    -- na coin
-                    root.CFrame = targetCF
-
-                    -- 0.3s na coinie + liczenie następnego
-                    local start = tick()
-                    while tick() - start < 0.3 do
-                        task.wait()
-                    end
-
-                    ignored[target] = true
-
-                    -- teleport na SPAWN
-                    root.CFrame = getSpawnCFrame()
-                end
-            end
-        else
+        if not target then
             ignored = {}
             task.wait(0.1)
+            continue
         end
 
-        task.wait()
+        local targetCF = target.CFrame * CFrame.new(0, 3, 0)
+
+        if _G.UseTween then
+            local tween = TweenService:Create(
+                root,
+                TweenInfo.new(dist / speed, Enum.EasingStyle.Linear),
+                {CFrame = targetCF}
+            )
+            tween:Play()
+
+            while _G.Active and target.Parent
+                and (root.Position - target.Position).Magnitude > 3 do
+                task.wait()
+            end
+
+            tween:Cancel()
+            ignored[target] = true
+        else
+            task.wait(dist / speed)
+
+            if not (_G.Active and target.Parent) then
+                continue
+            end
+
+            root.CFrame = targetCF
+
+            -- 0.5s na coinie
+            task.wait(0.5)
+
+            ignored[target] = true
+
+            -- teleport NA SPAWN zamiast do void
+            root.CFrame = getSpawn()
+        end
     end
 end)
 
--- ===== TRYB =====
+-- ===== BUTTONS =====
+btn.MouseButton1Click:Connect(function()
+    _G.Active = not _G.Active
+    btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
+    btn.BackgroundColor3 = _G.Active
+        and Color3.fromRGB(50, 150, 50)
+        or Color3.fromRGB(150, 50, 50)
+
+    if _G.Active then
+        ignored = {}
+    end
+end)
+
 modeBtn.MouseButton1Click:Connect(function()
     _G.UseTween = not _G.UseTween
     modeBtn.Text = _G.UseTween and "MODE: TWEEN" or "MODE: TELEPORT"
     modeBtn.BackgroundColor3 = _G.UseTween
         and Color3.fromRGB(60, 60, 160)
         or Color3.fromRGB(160, 60, 60)
+end)
+
+close.MouseButton1Click:Connect(function()
+    _G.Active = false
+    _G.Running = false
+    sg:Destroy()
 end)
