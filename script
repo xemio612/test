@@ -103,8 +103,7 @@ task.spawn(function()
                         
                         tween:Cancel()
                     else
-                        else
-    -- PRAWDZIWY TELEPORT (czekamy = dystans / speed, potem jedno cięcie)
+                       -- PRAWDZIWY TELEPORT (czekamy = dystans / speed, potem jedno cięcie)
     local waitTime = dist / speed
 
     task.wait(waitTime)
