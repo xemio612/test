@@ -6,17 +6,17 @@ local player = Players.LocalPlayer
 -- Ustawienia
 _G.AutoFarmRunning = true
 _G.AutoFarmActive = false
-local currentSpeed = 35 -- Zwiększyłem prędkość dla lepszego efektu
+local currentSpeed = 25 
 
 -- BIBLIOTEKA GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = game.CoreGui
-ScreenGui.Name = "MM2_Pro_Hub_V2"
+ScreenGui.Name = "MM2_Silent_Farm"
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 200, 0, 250)
 MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
@@ -27,9 +27,9 @@ UICorner.Parent = MainFrame
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "MM2 FAST FARMER"
+Title.Text = "MM2 SILENT FARMER"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 Title.Font = Enum.Font.SourceSansBold
 Title.Parent = MainFrame
 
@@ -39,26 +39,16 @@ ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
 ToggleBtn.Text = "START FARM"
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.Font = Enum.Font.SourceSans
 ToggleBtn.Parent = MainFrame
-
-local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Size = UDim2.new(1, 0, 0, 20)
-SpeedLabel.Position = UDim2.new(0, 0, 0.45, 0)
-SpeedLabel.Text = "Prędkość: " .. currentSpeed
-SpeedLabel.BackgroundTransparency = 1
-SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-SpeedLabel.Parent = MainFrame
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 25, 0, 25)
 CloseBtn.Position = UDim2.new(0.85, 0, 0, 0)
 CloseBtn.Text = "X"
 CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.Parent = MainFrame
 
--- NOCLIP
+-- NOCLIP (Płynny)
 RunService.Stepped:Connect(function()
     if _G.AutoFarmActive and player.Character then
         for _, part in pairs(player.Character:GetDescendants()) do
@@ -74,71 +64,71 @@ local function setGravity(state)
     local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if root then
         if state then
-            if not root:FindFirstChild("AntiFall") then
-                local bp = Instance.new("BodyVelocity")
-                bp.Name = "AntiFall"
-                bp.Velocity = Vector3.new(0, 0, 0)
-                bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                bp.Parent = root
-            end
+            local bv = root:FindFirstChild("FarmBV") or Instance.new("BodyVelocity")
+            bv.Name = "FarmBV"
+            bv.Velocity = Vector3.new(0, 0, 0)
+            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bv.Parent = root
         else
-            if root:FindFirstChild("AntiFall") then
-                root.AntiFall:Destroy()
-            end
+            if root:FindFirstChild("FarmBV") then root.FarmBV:Destroy() end
         end
     end
 end
 
 -- SZUKANIE MONET
 local function getClosestCoin()
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
-    
     local closest, dist = nil, math.huge
     for _, v in pairs(workspace:GetDescendants()) do
         if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and v.Parent then
             local d = (root.Position - v.Position).Magnitude
-            if d < dist then
-                dist = d
-                closest = v
-            end
+            if d < dist then dist = d; closest = v end
         end
     end
     return closest
 end
 
--- GŁÓWNA PĘTLA (SZYBKIE PRZECHODZENIE MIĘDZY MONETAMI)
+-- GŁÓWNA PĘTLA
 task.spawn(function()
     while _G.AutoFarmRunning do
         if _G.AutoFarmActive then
             local target = getClosestCoin()
-            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local head = char and char:FindFirstChild("Head")
             
-            if target and root then
-                local distance = (root.Position - target.Position).Magnitude
+            if target and root and head then
+                -- Oblicz pozycję głowy względem RootPart
+                local headOffset = head.Position - root.Position
+                
+                -- Celuj tak, aby głowa była 1.2 studa pod monetą (muśnięcie)
+                -- Zmieniamy CFrame docelowy, dodając lekki margines bezpieczeństwa
+                local targetPos = target.Position - Vector3.new(0, 1.2, 0) 
+                local finalCFrame = CFrame.new(targetPos - headOffset)
+                
+                local distance = (root.Position - finalCFrame.Position).Magnitude
                 local duration = distance / currentSpeed
                 
-                -- Start Tweena do monety
-                local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
+                local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = finalCFrame})
                 tween:Play()
                 
-                -- Kluczowa zmiana: nie czekamy na koniec tweena, tylko sprawdzamy dystans co klatkę
+                -- Przerwij tween, gdy tylko będziemy blisko (płynne przejście)
                 repeat 
                     task.wait() 
                     if not target or not target.Parent or not _G.AutoFarmActive then break end
-                until (root.Position - target.Position).Magnitude < 2 -- "Zbiórka" następuje 2 unity od celu
+                until (head.Position - target.Position).Magnitude < 1.8
                 
-                tween:Cancel() -- Natychmiastowe przerwanie ruchu do starej monety
+                tween:Cancel()
             else
-                task.wait(0.5) -- Czekaj jeśli nie ma monet na mapie
+                task.wait(0.1)
             end
         end
-        task.wait(0.01) -- Bardzo szybkie przejście do kolejnej iteracji pętli
+        task.wait(0.01)
     end
 end)
 
--- INTERFEJS AKCJE
+-- INTERFEJS
 ToggleBtn.MouseButton1Click:Connect(function()
     _G.AutoFarmActive = not _G.AutoFarmActive
     setGravity(_G.AutoFarmActive)
