@@ -1,153 +1,139 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
--- Zmienne konfiguracyjne
+-- Ustawienia
 _G.AutoFarmRunning = true
 _G.AutoFarmActive = false
+_G.Noclip = false
 local currentSpeed = 20
-local minSpeed = 15
-local maxSpeed = 25
 
--- Tworzenie GUI
+-- BIBLIOTEKA GUI (PROSTY PANEL)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = game.CoreGui
-ScreenGui.Name = "MM2_Smooth_GUI"
+ScreenGui.Name = "MM2_Pro_Hub"
 
-local Frame = Instance.new("Frame")
-Frame.Parent = ScreenGui
-Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Frame.Position = UDim2.new(0.05, 0, 0.4, 0)
-Frame.Size = UDim2.new(0, 180, 0, 130)
-Frame.Active = true
-Frame.Draggable = true
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 250)
+MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
 local UICorner = Instance.new("UICorner")
-UICorner.Parent = Frame
+UICorner.Parent = MainFrame
 
--- Przycisk Zamknięcia (X)
-local CloseButton = Instance.new("TextButton")
-CloseButton.Parent = Frame
-CloseButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-CloseButton.Position = UDim2.new(0.85, 0, -0.05, 0)
-CloseButton.Size = UDim2.new(0, 25, 0, 25)
-CloseButton.Text = "X"
-CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(1, 0)
-CloseCorner.Parent = CloseButton
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "MM2 FARMER PRO"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = MainFrame
 
--- Przycisk Toggle
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Parent = Frame
-ToggleButton.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
-ToggleButton.Position = UDim2.new(0.1, 0, 0.15, 0)
-ToggleButton.Size = UDim2.new(0.8, 0, 0.3, 0)
-ToggleButton.Text = "AUTO-FARM: OFF"
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Font = Enum.Font.SourceSansBold
-local TCorner = Instance.new("UICorner")
-TCorner.Parent = ToggleButton
+-- PRZYCISK TOGGLE
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
+ToggleBtn.Text = "START FARM"
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Parent = MainFrame
 
--- Suwak i Label
-local SliderFrame = Instance.new("Frame")
-SliderFrame.Parent = Frame
-SliderFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-SliderFrame.Position = UDim2.new(0.1, 0, 0.65, 0)
-SliderFrame.Size = UDim2.new(0.8, 0, 0.05, 0)
+-- PRZYCISK ZAMKNIĘCIA (X)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 20, 0, 20)
+CloseBtn.Position = UDim2.new(0.85, 0, 0.02, 0)
+CloseBtn.Text = "X"
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Parent = MainFrame
 
-local SliderButton = Instance.new("TextButton")
-SliderButton.Parent = SliderFrame
-SliderButton.BackgroundColor3 = Color3.fromRGB(80, 120, 255)
-SliderButton.Position = UDim2.new(0.5, -5, -1.5, 0)
-SliderButton.Size = UDim2.new(0, 10, 0, 20)
-SliderButton.Text = ""
-local SCorner = Instance.new("UICorner")
-SCorner.Parent = SliderButton
-
+-- STATUS SPEED
 local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Parent = Frame
-SpeedLabel.BackgroundTransparency = 1
-SpeedLabel.Position = UDim2.new(0.1, 0, 0.75, 0)
-SpeedLabel.Size = UDim2.new(0.8, 0, 0.2, 0)
+SpeedLabel.Size = UDim2.new(1, 0, 0, 20)
+SpeedLabel.Position = UDim2.new(0, 0, 0.45, 0)
 SpeedLabel.Text = "Speed: 20 studs/s"
-SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.Parent = MainFrame
 
--- Obsługa suwaka
-local dragging = false
-SliderButton.MouseButton1Down:Connect(function() dragging = true end)
-UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local percentage = math.clamp((input.Position.X - SliderFrame.AbsolutePosition.X) / SliderFrame.AbsoluteSize.X, 0, 1)
-        SliderButton.Position = UDim2.new(percentage, -5, -1.5, 0)
-        currentSpeed = minSpeed + (percentage * (maxSpeed - minSpeed))
-        SpeedLabel.Text = "Speed: " .. math.floor(currentSpeed) .. " studs/s"
+-- LOGIKA NOCLIP (Przenikanie przez ściany)
+RunService.Stepped:Connect(function()
+    if _G.AutoFarmActive and player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
     end
 end)
 
--- LOGIKA PŁYNNEGO ZBIERANIA
+-- LOGIKA ANTY-GRAWITACJI (Żeby nie spadać)
+local function setGravity(state)
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if root then
+        if state then
+            local bp = Instance.new("BodyVelocity")
+            bp.Name = "AntiFall"
+            bp.Velocity = Vector3.new(0, 0, 0)
+            bp.MaxForce = Vector3.new(0, 400000, 0)
+            bp.Parent = root
+        else
+            if root:FindFirstChild("AntiFall") then
+                root.AntiFall:Destroy()
+            end
+        end
+    end
+end
+
+-- FUNKCJA SZUKANIA MONET
 local function getClosestCoin()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
-    local closest, shortestDist = nil, math.huge
+    local closest, dist = nil, math.huge
     for _, v in pairs(workspace:GetDescendants()) do
         if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") then
-            local dist = (root.Position - v.Position).Magnitude
-            if dist < shortestDist then
-                shortestDist = dist
-                closest = v
-            end
+            local d = (root.Position - v.Position).Magnitude
+            if d < dist then dist = d; closest = v end
         end
     end
     return closest
 end
 
+-- GŁÓWNA PĘTLA
 task.spawn(function()
-    local currentTween = nil
-    
     while _G.AutoFarmRunning do
         if _G.AutoFarmActive then
             local target = getClosestCoin()
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
             if target and root then
-                -- Obliczamy czas na podstawie odległości, aby zachować stałą prędkość
-                local distance = (root.Position - target.Position).Magnitude
-                local duration = distance / currentSpeed
+                local duration = (root.Position - target.Position).Magnitude / currentSpeed
+                local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
+                tween:Play()
                 
-                -- Tworzymy tween
-                currentTween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
-                currentTween:Play()
-                
-                -- Płynność: Czekamy, aż moneta zostanie zebrana (zniszczona) LUB tween się skończy
-                repeat 
-                    task.wait() 
-                until not target or not target.Parent or not _G.AutoFarmActive or (root.Position - target.Position).Magnitude < 2
-                
-                if currentTween then currentTween:Cancel() end
-            else
-                task.wait(0.5) -- Czekaj na nowe monety
+                repeat task.wait() until not target or not target.Parent or not _G.AutoFarmActive
+                tween:Cancel()
             end
-        else
-            if currentTween then currentTween:Cancel() end
-            task.wait(0.5)
         end
-        task.wait()
+        task.wait(0.1)
     end
 end)
 
--- Przyciski
-ToggleButton.MouseButton1Click:Connect(function()
+-- OBSŁUGA INTERFEJSU
+ToggleBtn.MouseButton1Click:Connect(function()
     _G.AutoFarmActive = not _G.AutoFarmActive
-    ToggleButton.Text = _G.AutoFarmActive and "AUTO-FARM: ON" or "AUTO-FARM: OFF"
-    ToggleButton.BackgroundColor3 = _G.AutoFarmActive and Color3.fromRGB(40, 150, 40) or Color3.fromRGB(150, 40, 40)
+    setGravity(_G.AutoFarmActive)
+    ToggleBtn.Text = _G.AutoFarmActive and "STOP FARM" or "START FARM"
+    ToggleBtn.BackgroundColor3 = _G.AutoFarmActive and Color3.fromRGB(180, 60, 60) or Color3.fromRGB(60, 180, 60)
 end)
 
-CloseButton.MouseButton1Click:Connect(function()
+CloseBtn.MouseButton1Click:Connect(function()
     _G.AutoFarmRunning = false
     _G.AutoFarmActive = false
+    setGravity(false)
     ScreenGui:Destroy()
 end)
