@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
@@ -9,8 +10,9 @@ _G.Running = true
 
 local speed = 22
 local ignored = {}
+local farmMode = "TELEPORT" -- TELEPORT / TWEEN
 
--- GUI
+-- GUI CLEAN
 if player.PlayerGui:FindFirstChild("FastFarm") then
     player.PlayerGui.FastFarm:Destroy()
 end
@@ -40,7 +42,7 @@ close.Text = "X"
 close.TextColor3 = Color3.new(1,1,1)
 Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
 
--- SPEED SLIDER (15–25)
+-- SPEED SLIDER
 local sliderBg = Instance.new("Frame", sg)
 sliderBg.Size = UDim2.new(0,160,0,8)
 sliderBg.Position = UDim2.new(0.5,-80,0.13,0)
@@ -55,43 +57,67 @@ Instance.new("UICorner", slider)
 local dragging = false
 
 sliderBg.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-    end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
 end)
 
 sliderBg.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
 end)
+
+-- SPEED LABEL
+local speedLabel = Instance.new("TextLabel", sg)
+speedLabel.Size = UDim2.new(0,160,0,20)
+speedLabel.Position = UDim2.new(0.5,-80,0.15,0)
+speedLabel.BackgroundTransparency = 1
+speedLabel.TextColor3 = Color3.new(1,1,1)
+speedLabel.Font = Enum.Font.SourceSans
+speedLabel.TextSize = 14
+speedLabel.Text = "Speed: "..speed
 
 RunService.RenderStepped:Connect(function()
     if dragging then
         local mouseX = UserInputService:GetMouseLocation().X
         local x = math.clamp(
             (mouseX - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X,
-            0, 1
+            0,1
         )
         slider.Size = UDim2.new(x,0,1,0)
-        speed = math.floor(15 + (25 - 15) * x)
+        speed = math.floor(15 + (25-15)*x)
+        speedLabel.Text = "Speed: "..speed
     end
+end)
+
+-- MODE TOGGLE
+local modeBtn = Instance.new("TextButton", sg)
+modeBtn.Size = UDim2.new(0,160,0,35)
+modeBtn.Position = UDim2.new(0.5,-80,0.19,0)
+modeBtn.BackgroundColor3 = Color3.fromRGB(70,70,150)
+modeBtn.Text = "MODE: TELEPORT"
+modeBtn.TextColor3 = Color3.new(1,1,1)
+modeBtn.Font = Enum.Font.SourceSansBold
+modeBtn.TextSize = 16
+Instance.new("UICorner", modeBtn)
+
+modeBtn.MouseButton1Click:Connect(function()
+    farmMode = (farmMode == "TELEPORT") and "TWEEN" or "TELEPORT"
+    modeBtn.Text = "MODE: "..farmMode
+    ignored = {}
 end)
 
 -- WARNING
 local warn = Instance.new("TextLabel", sg)
-warn.Size = UDim2.new(0,240,0,30)
-warn.Position = UDim2.new(0.5,-120,0.16,0)
+warn.Size = UDim2.new(0,260,0,30)
+warn.Position = UDim2.new(0.5,-130,0.24,0)
 warn.BackgroundTransparency = 1
 warn.Text = "Warning: Speed above 22 may kick you"
 warn.TextColor3 = Color3.fromRGB(255,120,120)
 warn.Font = Enum.Font.SourceSans
 warn.TextSize = 14
 
--- SIGNATURE
+-- SIGN
 local sign = Instance.new("TextLabel", sg)
 sign.Size = UDim2.new(0,160,0,20)
-sign.Position = UDim2.new(0.5,-80,0.20,0)
+sign.Position = UDim2.new(0.5,-80,0.28,0)
 sign.BackgroundTransparency = 1
 sign.Text = "BY: xemio612"
 sign.TextColor3 = Color3.fromRGB(200,200,200)
@@ -109,7 +135,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- TELEPORT FARM (DYNAMIC SPEED)
+-- FARM LOGIC
 task.spawn(function()
     while _G.Running do
         if _G.Active then
@@ -123,7 +149,6 @@ task.spawn(function()
                     if (v.Name == "Coin" or v.Name == "Coin_Server")
                         and v:IsA("BasePart")
                         and not ignored[v] then
-
                         local d = (root.Position - v.Position).Magnitude
                         if d < dist then
                             dist = d
@@ -133,13 +158,29 @@ task.spawn(function()
                 end
 
                 if target then
-                    -- teleport directly to coin
-                    root.CFrame = target.CFrame * CFrame.new(0,3,0)
-                    ignored[target] = true
+                    local startCF = root.CFrame
+                    local endCF = target.CFrame * CFrame.new(0,3,0)
+                    local travelTime = dist / speed
+                    local elapsed = 0
 
-                    -- closer = faster
-                    local delayTime = math.clamp(dist / speed, 0.05, 1)
-                    task.wait(delayTime)
+                    if farmMode == "TELEPORT" then
+                        while elapsed < travelTime and _G.Active do
+                            local dt = RunService.RenderStepped:Wait()
+                            elapsed += dt
+                            local alpha = math.clamp(elapsed / travelTime, 0, 1)
+                            root.CFrame = startCF:Lerp(endCF, alpha)
+                        end
+                        ignored[target] = true
+                    else
+                        local tween = TweenService:Create(
+                            root,
+                            TweenInfo.new(travelTime, Enum.EasingStyle.Linear),
+                            {CFrame = endCF}
+                        )
+                        tween:Play()
+                        tween.Completed:Wait()
+                        ignored[target] = true
+                    end
                 else
                     ignored = {}
                     task.wait(0.2)
@@ -157,10 +198,7 @@ btn.MouseButton1Click:Connect(function()
     btn.BackgroundColor3 = _G.Active
         and Color3.fromRGB(50,150,50)
         or Color3.fromRGB(150,50,50)
-
-    if _G.Active then
-        ignored = {}
-    end
+    if _G.Active then ignored = {} end
 end)
 
 close.MouseButton1Click:Connect(function()
