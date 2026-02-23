@@ -1,56 +1,136 @@
--- Ustawienia i zmienne
-local Player = game.Players.LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
-local RootPart = Character:WaitForChild("HumanoidRootPart")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
 
-_G.FarmActive = false -- Stan początkowy
+-- Ustawienia
+_G.AutoFarmRunning = true
+_G.AutoFarmActive = false
+local currentSpeed = 20
+local ignoredCoins = {} -- Lista monet już zebranych/odwiedzonych
 
--- Tworzenie prostego przycisku GUI
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-local ToggleBtn = Instance.new("TextButton", ScreenGui)
+-- GUI Library Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.Name = "MM2_Flow_Hub"
 
-ToggleBtn.Size = UDim2.new(0, 150, 0, 50)
-ToggleBtn.Position = UDim2.new(0.5, -75, 0.1, 0)
-ToggleBtn.Text = "Farm Coins: OFF"
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 180)
+MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame)
 
--- Funkcja szukająca najbliższej monety
-local function getClosestCoin()
-    local closestCoin = nil
-    local shortestDistance = math.huge
-    
-    -- W MM2 monety zazwyczaj są w folderze o nazwie "CoinContainer" lub po prostu w Workspace
-    -- Szukamy obiektów o nazwie "Coin_Server" lub "Coin"
-    for _, obj in pairs(game.Workspace:GetDescendants()) do
-        if obj.Name == "Coin_Server" or obj.Name == "Coin" then
-            -- Sprawdź czy moneta nie została już zebrana (często zmieniają Transparency)
-            if obj:IsA("BasePart") and obj.Transparency < 1 then
-                local distance = (RootPart.Position - obj.Position).Magnitude
-                if distance < shortestDistance then
-                    shortestDistance = distance
-                    closestCoin = obj
-                end
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Text = "MM2 FLOW FARMER"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+Title.Parent = MainFrame
+Instance.new("UICorner", Title)
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.8, 0, 0, 45)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
+ToggleBtn.Text = "START FLOW"
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Parent = MainFrame
+Instance.new("UICorner", ToggleBtn)
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Position = UDim2.new(0.85, -5, 0.05, 0)
+CloseBtn.Text = "X"
+CloseBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Parent = MainFrame
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
+
+-- NOCLIP & ANTI-GRAVITY
+RunService.Stepped:Connect(function()
+    if _G.AutoFarmActive and player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
             end
         end
     end
-    return closestCoin
+end)
+
+-- FUNKCJA SZUKANIA NAJBLIŻSZEJ, NIEZIGNOROWANEJ MONETY
+local function getNextTarget()
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local closest, minDist = nil, math.huge
+    
+    for _, v in pairs(workspace:GetDescendants()) do
+        -- Sprawdzamy nazwę i czy moneta nie jest na czarnej liście
+        if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignoredCoins[v] then
+            local d = (root.Position - v.Position).Magnitude
+            if d < minDist then
+                minDist = d
+                closest = v
+            end
+        end
+    end
+    return closest
 end
 
--- Obsługa kliknięcia
-ToggleBtn.MouseButton1Click:Connect(function()
-    _G.FarmActive = not _G.FarmActive
-    ToggleBtn.Text = _G.FarmActive and "Farm Coins: ON" or "Farm Coins: OFF"
-    ToggleBtn.BackgroundColor3 = _G.FarmActive and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
-    
-    -- Pętla główna
-    task.spawn(function()
-        while _G.FarmActive do
-            local target = getClosestCoin()
-            if target then
-                -- Przesunięcie postaci (CFrame)
-                RootPart.CFrame = target.CFrame
+-- GŁÓWNA PĘTLA
+task.spawn(function()
+    while _G.AutoFarmRunning do
+        if _G.AutoFarmActive then
+            local target = getNextTarget()
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            
+            if target and root then
+                local dist = (root.Position - target.Position).Magnitude
+                local duration = dist / currentSpeed
+                
+                local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
+                tween:Play()
+                
+                -- Czekaj aż dotrzesz bardzo blisko LUB moneta zniknie
+                repeat 
+                    task.wait() 
+                until not target or not target.Parent or not _G.AutoFarmActive or (root.Position - target.Position).Magnitude < 2.5
+                
+                -- Dodaj do ignorowanych, żeby nie wracać do tej samej monety w tej samej pętli
+                if target then
+                    ignoredCoins[target] = true
+                end
+                
+                tween:Cancel()
+            else
+                -- Jeśli nie ma monet, wyczyść listę ignorowanych (może się zrespiły nowe)
+                ignoredCoins = {}
+                task.wait(1)
             end
-            task.wait(0.1) -- Czas oczekiwania między "skokami"
         end
-    end)
+        task.wait()
+    end
+end)
+
+-- OBSŁUGA PRZYCISKÓW
+ToggleBtn.MouseButton1Click:Connect(function()
+    _G.AutoFarmActive = not _G.AutoFarmActive
+    if _G.AutoFarmActive then
+        ToggleBtn.Text = "STOP FLOW"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+        ignoredCoins = {} -- Reset przy starcie
+    else
+        ToggleBtn.Text = "START FLOW"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    _G.AutoFarmRunning = false
+    _G.AutoFarmActive = false
+    ScreenGui:Destroy()
 end)
