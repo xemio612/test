@@ -1,5 +1,4 @@
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
@@ -9,14 +8,10 @@ _G.Running = true
 local speed = 22
 local ignored = {}
 
-local touchCount = 0
-local TOUCH_LIMIT = 40
-
 -- RESET CHARACTER
 local function resetCharacter()
     if player.Character then
         player.Character:BreakJoints()
-        touchCount = 0
         ignored = {}
         task.wait(2)
     end
@@ -32,7 +27,8 @@ sg.Name = "FastFarm"
 sg.Parent = player:WaitForChild("PlayerGui")
 sg.ResetOnSpawn = false
 
-local btn = Instance.new("TextButton")
+-- FARM BUTTON
+local btn = Instance.new("TextButton", sg)
 btn.Size = UDim2.new(0,160,0,45)
 btn.Position = UDim2.new(0.5,-80,0.05,0)
 btn.BackgroundColor3 = Color3.fromRGB(150,50,50)
@@ -40,27 +36,70 @@ btn.Text = "FARM: OFF"
 btn.TextColor3 = Color3.new(1,1,1)
 btn.Font = Enum.Font.SourceSansBold
 btn.TextSize = 18
-btn.Parent = sg
-Instance.new("UICorner",btn)
+Instance.new("UICorner", btn)
 
-local close = Instance.new("TextButton")
+-- CLOSE
+local close = Instance.new("TextButton", sg)
 close.Size = UDim2.new(0,25,0,25)
 close.Position = UDim2.new(0.5,90,0.05,0)
 close.BackgroundColor3 = Color3.fromRGB(200,0,0)
 close.Text = "X"
 close.TextColor3 = Color3.new(1,1,1)
-close.Parent = sg
-Instance.new("UICorner",close).CornerRadius = UDim.new(1,0)
+Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
 
-local sign = Instance.new("TextLabel")
+-- SPEED SLIDER
+local sliderBg = Instance.new("Frame", sg)
+sliderBg.Size = UDim2.new(0,160,0,8)
+sliderBg.Position = UDim2.new(0.5,-80,0.13,0)
+sliderBg.BackgroundColor3 = Color3.fromRGB(80,80,80)
+Instance.new("UICorner", sliderBg)
+
+local slider = Instance.new("Frame", sliderBg)
+slider.Size = UDim2.new((speed-15)/10,0,1,0)
+slider.BackgroundColor3 = Color3.fromRGB(50,200,50)
+Instance.new("UICorner", slider)
+
+local dragging = false
+
+sliderBg.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+end)
+
+sliderBg.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if dragging then
+        local mouseX = game:GetService("UserInputService"):GetMouseLocation().X
+        local x = math.clamp(
+            (mouseX - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X,
+            0,1
+        )
+        slider.Size = UDim2.new(x,0,1,0)
+        speed = math.floor(15 + (25-15)*x)
+    end
+end)
+
+-- WARNING
+local warn = Instance.new("TextLabel", sg)
+warn.Size = UDim2.new(0,220,0,30)
+warn.Position = UDim2.new(0.5,-110,0.16,0)
+warn.BackgroundTransparency = 1
+warn.Text = "Warning: Speed above 22 may kick you"
+warn.TextColor3 = Color3.fromRGB(255,120,120)
+warn.Font = Enum.Font.SourceSans
+warn.TextSize = 14
+
+-- SIGN
+local sign = Instance.new("TextLabel", sg)
 sign.Size = UDim2.new(0,160,0,20)
-sign.Position = UDim2.new(0.5,-80,0.12,0)
+sign.Position = UDim2.new(0.5,-80,0.20,0)
 sign.BackgroundTransparency = 1
 sign.Text = "BY: xemio612"
 sign.TextColor3 = Color3.fromRGB(200,200,200)
-sign.TextSize = 14
 sign.Font = Enum.Font.SourceSansItalic
-sign.Parent = sg
+sign.TextSize = 14
 
 -- NOCLIP
 RunService.Stepped:Connect(function()
@@ -73,7 +112,21 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- FARM LOGIC
+-- FULL BAG DETECTION
+task.spawn(function()
+    while _G.Running do
+        for _,gui in pairs(player.PlayerGui:GetDescendants()) do
+            if gui:IsA("TextLabel") and gui.Text then
+                if string.lower(gui.Text):find("full") then
+                    resetCharacter()
+                end
+            end
+        end
+        task.wait(0.3)
+    end
+end)
+
+-- TELEPORT FARM LOGIC
 task.spawn(function()
     while _G.Running do
         if _G.Active then
@@ -81,8 +134,7 @@ task.spawn(function()
             local root = char and char:FindFirstChild("HumanoidRootPart")
 
             if root then
-                local target = nil
-                local dist = math.huge
+                local target, dist = nil, math.huge
 
                 for _,v in pairs(workspace:GetDescendants()) do
                     if (v.Name == "Coin" or v.Name == "Coin_Server")
@@ -98,31 +150,15 @@ task.spawn(function()
                 end
 
                 if target then
-                    local tween = TweenService:Create(
-                        root,
-                        TweenInfo.new(dist/speed, Enum.EasingStyle.Linear),
-                        {CFrame = target.CFrame * CFrame.new(0,3,0)}
-                    )
-                    tween:Play()
-
-                    -- czekamy aż FAKTYCZNIE DOTKNIE
-                    while target
-                        and target.Parent
-                        and _G.Active
-                        and (root.Position - target.Position).Magnitude > 3 do
-                        task.wait()
-                    end
-
-                    tween:Cancel()
+                    root.CFrame = target.CFrame * CFrame.new(0,3,0)
                     ignored[target] = true
-                    touchCount += 1
 
-                    if touchCount >= TOUCH_LIMIT then
-                        resetCharacter()
-                    end
+                    -- im bliżej, tym szybciej
+                    local delayTime = math.clamp(dist / speed, 0.05, 1)
+                    task.wait(delayTime)
                 else
                     ignored = {}
-                    task.wait(0.1)
+                    task.wait(0.2)
                 end
             end
         end
@@ -137,11 +173,7 @@ btn.MouseButton1Click:Connect(function()
     btn.BackgroundColor3 = _G.Active
         and Color3.fromRGB(50,150,50)
         or Color3.fromRGB(150,50,50)
-
-    if _G.Active then
-        ignored = {}
-        touchCount = 0
-    end
+    if _G.Active then ignored = {} end
 end)
 
 close.MouseButton1Click:Connect(function()
