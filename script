@@ -1,91 +1,157 @@
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 
--- Zmienne
-_G.AutoFarm = false
+-- Zmienne systemowe
+_G.FarmActive = false
 _G.AutoReset = false
-_G.Speed = 20
+_G.FlySpeed = 20
+_G.Running = true
 local ignoredCoins = {}
 
--- Okno Główne
-local Window = OrionLib:MakeWindow({Name = "MM2 Ultimate Farmer", HidePremium = false, SaveConfig = true, ConfigFolder = "OrionTest"})
+-- STWORZENIE INTERFEJSU
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CustomMM2_Hub"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Zakładka Główna
-local MainTab = Window:MakeTab({
-	Name = "Farma",
-	Icon = "rbxassetid://4483345998",
-	PremiumOnly = false
-})
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Parent = ScreenGui
+Main.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+Main.Position = UDim2.new(0.3, 0, 0.3, 0)
+Main.Size = UDim2.new(0, 220, 0, 280)
+Main.Active = true
+Main.Draggable = true -- Możesz przesuwać okno
 
--- Powiadomienie na start
-OrionLib:MakeNotification({
-	Name = "Wczytano!",
-	Content = "Skrypt MM2 Orion Gotowy.",
-	Image = "rbxassetid://4483345998",
-	Time = 5
-})
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = Main
 
--- LOGIKA NOCLIP (Działa zawsze w tle gdy Farma jest ON)
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Parent = Main
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+Title.Text = "MM2 CUSTOM HUB"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.Parent = Title
+
+local Close = Instance.new("TextButton")
+Close.Name = "Close"
+Close.Parent = Main
+Close.Position = UDim2.new(0.85, 0, 0.02, 0)
+Close.Size = UDim2.new(0, 25, 0, 25)
+Close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+Close.Text = "X"
+Close.TextColor3 = Color3.fromRGB(255, 255, 255)
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(1, 0)
+CloseCorner.Parent = Close
+
+-- PRZYCISK: AUTO FARM
+local FarmBtn = Instance.new("TextButton")
+FarmBtn.Parent = Main
+FarmBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
+FarmBtn.Size = UDim2.new(0.8, 0, 0, 35)
+FarmBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+FarmBtn.Text = "AUTO-FARM: OFF"
+FarmBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+FarmBtn.Font = Enum.Font.Gotham
+Instance.new("UICorner", FarmBtn)
+
+-- PRZYCISK: AUTO RESET
+local ResetBtn = Instance.new("TextButton")
+ResetBtn.Parent = Main
+ResetBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
+ResetBtn.Size = UDim2.new(0.8, 0, 0, 35)
+ResetBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+ResetBtn.Text = "AUTO-RESET: OFF"
+ResetBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+ResetBtn.Font = Enum.Font.Gotham
+Instance.new("UICorner", ResetBtn)
+
+-- SUWAK PRĘDKOŚCI
+local SliderTitle = Instance.new("TextLabel")
+SliderTitle.Parent = Main
+SliderTitle.Position = UDim2.new(0.1, 0, 0.55, 0)
+SliderTitle.Size = UDim2.new(0.8, 0, 0, 20)
+SliderTitle.BackgroundTransparency = 1
+SliderTitle.Text = "Speed: 20 studs/s"
+SliderTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+SliderTitle.Font = Enum.Font.Gotham
+
+local SliderBack = Instance.new("Frame")
+SliderBack.Parent = Main
+SliderBack.Position = UDim2.new(0.1, 0, 0.65, 0)
+SliderBack.Size = UDim2.new(0.8, 0, 0, 6)
+SliderBack.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+
+local SliderDot = Instance.new("TextButton")
+SliderDot.Parent = SliderBack
+SliderDot.Size = UDim2.new(0, 15, 0, 15)
+SliderDot.Position = UDim2.new(0.5, -7, -0.7, 0)
+SliderDot.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+SliderDot.Text = ""
+Instance.new("UICorner", SliderDot)
+
+-- LOGIKA NOCLIP
 RunService.Stepped:Connect(function()
-    if _G.AutoFarm and player.Character then
-        for _, v in pairs(player.Character:GetDescendants()) do
-            if v:IsA("BasePart") then v.CanCollide = false end
+    if _G.FarmActive and player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
         end
     end
 end)
 
--- FUNKCJE POMOCNICZE
-local function isBagFull()
-    local mainGui = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("MainGui")
-    if mainGui then
-        local gameFrame = mainGui:FindFirstChild("Game")
-        local coinBackpack = gameFrame and gameFrame:FindFirstChild("CoinBackpack")
-        if coinBackpack and coinBackpack:FindFirstChild("Full") then
-            return coinBackpack.Full.Visible
-        end
+-- LOGIKA SPRAWDZANIA WORKA
+local function isFull()
+    local gui = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("MainGui")
+    if gui and gui:FindFirstChild("Game") and gui.Game:FindFirstChild("CoinBackpack") then
+        return gui.Game.CoinBackpack:FindFirstChild("Full") and gui.Game.CoinBackpack.Full.Visible
     end
     return false
 end
 
-local function getNextTarget()
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
+-- LOGIKA SZUKANIA MONET
+local function getCoin()
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
-    local closest, minDist = nil, math.huge
+    local closest, dist = nil, math.huge
     for _, v in pairs(workspace:GetDescendants()) do
         if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignoredCoins[v] then
             local d = (root.Position - v.Position).Magnitude
-            if d < minDist then minDist = d; closest = v end
+            if d < dist then dist = d; closest = v end
         end
     end
     return closest
 end
 
--- PĘTLA FARMY
+-- PĘTLA GŁÓWNA
 task.spawn(function()
-    while true do
-        if _G.AutoFarm then
-            if _G.AutoReset and isBagFull() then
+    while _G.Running do
+        if _G.FarmActive then
+            if _G.AutoReset and isFull() then
                 if player.Character then player.Character:BreakJoints() end
                 task.wait(5)
             end
-
-            local target = getNextTarget()
+            
+            local target = getCoin()
             local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
             if target and root then
-                local dist = (root.Position - target.Position).Magnitude
-                local duration = dist / _G.Speed
+                local duration = (root.Position - target.Position).Magnitude / _G.FlySpeed
                 local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
                 tween:Play()
-                
-                repeat task.wait() until not target or not target.Parent or not _G.AutoFarm or (root.Position - target.Position).Magnitude < 2.5
+                repeat task.wait() until not target or not target.Parent or not _G.FarmActive or (root.Position - target.Position).Magnitude < 2.5
                 if target then ignoredCoins[target] = true end
                 tween:Cancel()
             else
-                ignoredCoins = {}
+                ignoredCoins = {} -- Resetuj listę gdy pusto
                 task.wait(1)
             end
         end
@@ -93,43 +159,33 @@ task.spawn(function()
     end
 end)
 
--- ELEMENTY GUI
-MainTab:AddToggle({
-	Name = "Włącz Auto-Farm",
-	Default = false,
-	Callback = function(Value)
-		_G.AutoFarm = Value
-        if not Value then ignoredCoins = {} end
-	end    
-})
+-- OBSŁUGA PRZYCISKÓW I SUWAKA
+FarmBtn.MouseButton1Click:Connect(function()
+    _G.FarmActive = not _G.FarmActive
+    FarmBtn.Text = _G.FarmActive and "AUTO-FARM: ON" or "AUTO-FARM: OFF"
+    FarmBtn.BackgroundColor3 = _G.FarmActive and Color3.fromRGB(60, 150, 60) or Color3.fromRGB(50, 50, 55)
+end)
 
-MainTab:AddToggle({
-	Name = "Auto Reset (Full Bag)",
-	Default = false,
-	Callback = function(Value)
-		_G.AutoReset = Value
-	end    
-})
+ResetBtn.MouseButton1Click:Connect(function()
+    _G.AutoReset = not _G.AutoReset
+    ResetBtn.Text = _G.AutoReset and "AUTO-RESET: ON" or "AUTO-RESET: OFF"
+    ResetBtn.BackgroundColor3 = _G.AutoReset and Color3.fromRGB(60, 100, 150) or Color3.fromRGB(50, 50, 55)
+end)
 
-MainTab:AddSlider({
-	Name = "Prędkość (Studs/s)",
-	Min = 15,
-	Max = 25,
-	Default = 20,
-	Color = Color3.fromRGB(255,255,255),
-	Increment = 1,
-	ValueName = "studs/s",
-	Callback = function(Value)
-		_G.Speed = Value
-	end    
-})
+local dragSlider = false
+SliderDot.MouseButton1Down:Connect(function() dragSlider = true end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragSlider = false end end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local pos = math.clamp((input.Position.X - SliderBack.AbsolutePosition.X) / SliderBack.AbsoluteSize.X, 0, 1)
+        SliderDot.Position = UDim2.new(pos, -7, -0.7, 0)
+        _G.FlySpeed = 15 + (pos * 10) -- 15 do 25
+        SliderTitle.Text = "Speed: " .. math.floor(_G.FlySpeed) .. " studs/s"
+    end
+end)
 
-MainTab:AddButton({
-	Name = "Usuń Skrypt i GUI",
-	Callback = function()
-        _G.AutoFarm = false
-        OrionLib:Destroy()
-	end    
-})
-
-OrionLib:Init()
+Close.MouseButton1Click:Connect(function()
+    _G.Running = false
+    _G.FarmActive = false
+    ScreenGui:Destroy()
+end)
