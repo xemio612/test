@@ -4,88 +4,96 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 _G.Active = false
-_G.AutoReset = false 
 _G.Running = true 
-local speed = 22
+_G.AutoReset = false -- Nowa zmienna dla resetu
+local speed = 22 
 local ignored = {}
 
--- GUI Setup
+-- GUI
 if player.PlayerGui:FindFirstChild("FastFarm") then player.PlayerGui.FastFarm:Destroy() end
-local sg = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+local sg = Instance.new("ScreenGui")
 sg.Name = "FastFarm"
+sg.Parent = player:WaitForChild("PlayerGui")
 sg.ResetOnSpawn = false
 
-local function createBtn(name, pos, color)
-    local b = Instance.new("TextButton", sg)
-    b.Size = UDim2.new(0, 150, 0, 40)
-    b.Position = pos
-    b.BackgroundColor3 = color
-    b.Text = name
-    b.TextColor3 = Color3.new(1, 1, 1)
-    b.Font = Enum.Font.SourceSansBold
-    b.TextSize = 16
-    Instance.new("UICorner", b)
-    return b
-end
+-- Przycisk FARM
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 160, 0, 40)
+btn.Position = UDim2.new(0.5, -170, 0.05, 0)
+btn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+btn.Text = "FARM: OFF"
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 16
+btn.Parent = sg
+Instance.new("UICorner", btn)
 
-local btn = createBtn("FARM: OFF", UDim2.new(0.5, -155, 0.05, 0), Color3.fromRGB(150, 50, 50))
-local rbtn = createBtn("RESET: OFF", UDim2.new(0.5, 5, 0.05, 0), Color3.fromRGB(150, 50, 50))
+-- Przycisk AUTO RESET
+local resetBtn = Instance.new("TextButton")
+resetBtn.Size = UDim2.new(0, 160, 0, 40)
+resetBtn.Position = UDim2.new(0.5, 0, 0.05, 0)
+resetBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+resetBtn.Text = "AUTO RESET: OFF"
+resetBtn.TextColor3 = Color3.new(1, 1, 1)
+resetBtn.Font = Enum.Font.SourceSansBold
+resetBtn.TextSize = 16
+resetBtn.Parent = sg
+Instance.new("UICorner", resetBtn)
 
-local close = Instance.new("TextButton", sg)
+local close = Instance.new("TextButton")
 close.Size = UDim2.new(0, 25, 0, 25)
-close.Position = UDim2.new(0.5, 165, 0.05, 0)
-close.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+close.Position = UDim2.new(0.5, 170, 0.05, 0)
+close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
 close.Text = "X"
 close.TextColor3 = Color3.new(1, 1, 1)
+close.Parent = sg
 Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
 
--- FUNKCJA SPRAWDZANIA STANU TORBY
+-- NOCLIP
+RunService.Stepped:Connect(function()
+    if _G.Active and player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
+end)
+
+-- FUNKCJA SPRAWDZANIA TORBY
 local function isBagFull()
-    local char = player.Character
-    local backpack = player:FindFirstChild("Backpack")
-    -- Szukanie kontenera w Backpack lub bezpośrednio w postaci
-    local container = (backpack and backpack:FindFirstChild("CoinContainer")) or (char and char:FindFirstChild("CoinContainer"))
-    
-    if container then
-        local loot = container:FindFirstChild("Loot")
-        local maxLoot = container:FindFirstChild("MaxLoot")
-        if loot and maxLoot and maxLoot.Value > 0 then
-            return loot.Value >= maxLoot.Value
+    local coinData = player:FindFirstChild("CoinData")
+    if coinData then
+        local coins = coinData:FindFirstChild("Coins")
+        local maxCoins = coinData:FindFirstChild("MaxCoins") -- W MM2 zazwyczaj 40 lub 50
+        if coins and maxCoins then
+            return coins.Value >= maxCoins.Value
         end
     end
     return false
 end
 
--- NOCLIP (Stały podczas pracy skryptu)
-RunService.Stepped:Connect(function()
-    if _G.Active and player.Character then
-        for _, v in pairs(player.Character:GetDescendants()) do
-            if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
-        end
-    end
-end)
-
--- GŁÓWNA PĘTLA
+-- LOGIKA RUCHU
 task.spawn(function()
     while _G.Running do
         if _G.Active then
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChild("Humanoid")
-
-            -- Jeśli reset jest włączony i torba pełna - zabij postać
+            -- Sprawdzanie Auto Resetu
             if _G.AutoReset and isBagFull() then
-                if hum and hum.Health > 0 then
-                    hum.Health = 0
-                    task.wait(3) -- Czas na odrodzenie i załadowanie torby
+                if player.Character and player.Character:FindFirstChild("Humanoid") then
+                    player.Character.Humanoid.Health = 0
+                    _G.Active = false -- Wyłączamy farmę na chwilę, żeby nie świrowała podczas respawnu
+                    btn.Text = "FARM: OFF (RESPAWN)"
+                    task.wait(5) -- Czekamy na respawn
+                    _G.Active = true
+                    btn.Text = "FARM: ON"
                 end
             end
 
-            if root and hum and hum.Health > 0 then
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if root then
                 local target = nil
                 local dist = math.huge
                 
-                -- Szukanie najbliższej monety
                 for _, v in pairs(workspace:GetDescendants()) do
                     if (v.Name == "Coin_Server" or v.Name == "Coin") and v:IsA("BasePart") and not ignored[v] then
                         local d = (root.Position - v.Position).Magnitude
@@ -98,36 +106,34 @@ task.spawn(function()
                     local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = targetPos})
                     tween:Play()
                     
-                    -- Pętla sprawdzająca podczas lotu
                     while target and target.Parent and _G.Active and (root.Position - target.Position).Magnitude > 3 do
-                        if _G.AutoReset and isBagFull() then break end 
-                        if not player.Character or not player.Character:FindFirstChild("Humanoid") or player.Character.Humanoid.Health <= 0 then break end
                         task.wait()
                     end
                     
                     ignored[target] = true
                     tween:Cancel()
                 else
-                    ignored = {} -- Reset listy zignorowanych jeśli nie ma monet
-                    task.wait(1)
+                    ignored = {}
+                    task.wait(0.1)
                 end
             end
         end
-        task.wait(0.1)
+        task.wait()
     end
 end)
 
--- EVENTY
+-- OBSŁUGA PRZYCISKÓW
 btn.MouseButton1Click:Connect(function()
     _G.Active = not _G.Active
     btn.Text = _G.Active and "FARM: ON" or "FARM: OFF"
     btn.BackgroundColor3 = _G.Active and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
+    if _G.Active then ignored = {} end
 end)
 
-rbtn.MouseButton1Click:Connect(function()
+resetBtn.MouseButton1Click:Connect(function()
     _G.AutoReset = not _G.AutoReset
-    rbtn.Text = _G.AutoReset and "RESET: ON" or "RESET: OFF"
-    rbtn.BackgroundColor3 = _G.AutoReset and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
+    resetBtn.Text = _G.AutoReset and "AUTO RESET: ON" or "AUTO RESET: OFF"
+    resetBtn.BackgroundColor3 = _G.AutoReset and Color3.fromRGB(50, 120, 150) or Color3.fromRGB(80, 80, 80)
 end)
 
 close.MouseButton1Click:Connect(function()
