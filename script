@@ -1,155 +1,88 @@
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
--- =======================
--- USTAWIENIA
--- =======================
-_G.AutoFarmRunning = true
-_G.AutoFarmActive = false
+-- Ustawienia
+_G.AutoFarmActive = false -- Domyślnie wyłączone
+local toggleKey = Enum.KeyCode.P -- Klawisz aktywacji
+local moveSpeed = 25 -- Prędkość (studs per second)
 
-local TELEPORT_DELAY = 1        -- co ile sekund cykl
-local COIN_STAY_TIME = 0.1      -- ile sekund stoi na monecie
-local hoverHeight = 2.5         -- zbieranie "nogami"
-
--- =======================
--- GUI
--- =======================
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-ScreenGui.Name = "MM2_Pro_Hub"
-
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 200, 0, 200)
-MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-
-Instance.new("UICorner", MainFrame)
-
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "MM2 TP FARM"
-Title.TextColor3 = Color3.new(1,1,1)
-Title.BackgroundColor3 = Color3.fromRGB(45,45,50)
-Title.Font = Enum.Font.SourceSansBold
-
-local ToggleBtn = Instance.new("TextButton", MainFrame)
-ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.25, 0)
-ToggleBtn.Text = "START FARM"
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(60,180,60)
-ToggleBtn.TextColor3 = Color3.new(1,1,1)
-
-local CloseBtn = Instance.new("TextButton", MainFrame)
-CloseBtn.Size = UDim2.new(0,20,0,20)
-CloseBtn.Position = UDim2.new(0.85,0,0.02,0)
-CloseBtn.Text = "X"
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
-
--- =======================
--- NOCLIP
--- =======================
-RunService.Stepped:Connect(function()
-    if _G.AutoFarmActive and player.Character then
-        for _, p in ipairs(player.Character:GetDescendants()) do
-            if p:IsA("BasePart") then
-                p.CanCollide = false
-            end
-        end
-    end
-end)
-
--- =======================
--- SPAWN (zapamiętany raz)
--- =======================
-local spawnCFrame = nil
-
-local function cacheSpawn()
-    local char = player.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if root then
-        spawnCFrame = root.CFrame
-    end
-end
-
-player.CharacterAdded:Connect(function()
-    task.wait(1)
-    cacheSpawn()
-end)
-
--- =======================
--- NAJBLIŻSZA MONETA
--- =======================
+-- Funkcja szukająca najbliższej monety (dynamiczna lokalizacja)
 local function getClosestCoin()
-    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+    
+    local rootPart = character.HumanoidRootPart
+    local closestCoin = nil
+    local shortestDistance = math.huge
 
-    local best, dist = nil, math.huge
-    for _, v in ipairs(workspace:GetDescendants()) do
-        if (v.Name == "Coin" or v.Name == "Coin_Server")
-        and v:IsA("BasePart")
-        and v.Parent then
+    -- MM2 dynamicznie zmienia kontenery, szukamy najczęstszych nazw
+    local potentialFolders = {
+        workspace:FindFirstChild("Normal") and workspace.Normal:FindFirstChild("CoinContainer"),
+        workspace:FindFirstChild("CoinsHolder"),
+        workspace:FindFirstChild("CoinContainer")
+    }
 
-            local d = (root.Position - v.Position).Magnitude
-            if d < dist then
-                dist = d
-                best = v
-            end
-        end
-    end
-    return best
-end
-
--- =======================
--- GŁÓWNA PĘTLA TP FARMU
--- =======================
-task.spawn(function()
-    while _G.AutoFarmRunning do
-        if _G.AutoFarmActive then
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-
-            if root and spawnCFrame then
-                local coin = getClosestCoin()
-                if coin then
-                    -- TP DO MONETY
-                    root.CFrame = CFrame.new(
-                        coin.Position.X,
-                        coin.Position.Y + hoverHeight,
-                        coin.Position.Z
-                    )
-
-                    task.wait(COIN_STAY_TIME)
-
-                    -- TP NA SPAWN
-                    root.CFrame = spawnCFrame
+    for _, folder in pairs(potentialFolders) do
+        if folder then
+            for _, coin in pairs(folder:GetChildren()) do
+                if coin:IsA("BasePart") or coin:FindFirstChild("TouchInterest") then
+                    local distance = (rootPart.Position - coin.Position).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestCoin = coin
+                    end
                 end
             end
         end
-        task.wait(TELEPORT_DELAY)
+    end
+    return closestCoin
+end
+
+-- Funkcja płynnego ruchu
+local function moveToCoin(targetCoin)
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local rootPart = character.HumanoidRootPart
+    local distance = (rootPart.Position - targetCoin.Position).Magnitude
+    local duration = distance / moveSpeed
+
+    local tween = TweenService:Create(rootPart, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCoin.CFrame})
+    
+    tween:Play()
+    return tween -- Zwracamy tween, żeby móc go przerwać
+end
+
+-- Obsługa Toggle
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == toggleKey then
+        _G.AutoFarmActive = not _G.AutoFarmActive
+        print("AutoFarm status: " .. tostring(_G.AutoFarmActive))
+        
+        if _G.AutoFarmActive then
+            -- Uruchomienie pętli w osobnym wątku
+            task.spawn(function()
+                while _G.AutoFarmActive do
+                    local target = getClosestCoin()
+                    if target and target.Parent then
+                        local currentTween = moveToCoin(target)
+                        
+                        -- Czekaj aż moneta zniknie (zostanie zebrana) lub pętla zostanie wyłączona
+                        repeat 
+                            task.wait(0.1) 
+                        until not target.Parent or not _G.AutoFarmActive
+                        
+                        if currentTween then currentTween:Cancel() end
+                    else
+                        task.wait(1)
+                    end
+                end
+            end)
+        end
     end
 end)
 
--- =======================
--- BUTTONY
--- =======================
-ToggleBtn.MouseButton1Click:Connect(function()
-    _G.AutoFarmActive = not _G.AutoFarmActive
-    if _G.AutoFarmActive then
-        cacheSpawn()
-    end
-
-    ToggleBtn.Text = _G.AutoFarmActive and "STOP FARM" or "START FARM"
-    ToggleBtn.BackgroundColor3 = _G.AutoFarmActive
-        and Color3.fromRGB(180,60,60)
-        or Color3.fromRGB(60,180,60)
-end)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    _G.AutoFarmRunning = false
-    _G.AutoFarmActive = false
-    ScreenGui:Destroy()
-end)
+print("Skrypt załadowany! Naciśnij 'P', aby przełączyć AutoFarm.")
