@@ -73,7 +73,7 @@ task.spawn(function()
                     
                     -- KLUCZ DO PŁYNNOŚCI:
                     -- Czekamy aż będziemy BARDZO blisko, ale nie idealnie w środku (4 unity)
-                    while target and target.Parent and _G.Active and (root.Position - target.Position).Magnitude > 2 do
+                    while target and target.Parent and _G.Active and (root.Position - target.Position).Magnitude > 4 do
                         task.wait()
                     end
                     
