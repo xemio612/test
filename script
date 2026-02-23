@@ -113,7 +113,6 @@ task.spawn(function()
     end
 end
 
-
 -- PRZYCISKI
 btn.MouseButton1Click:Connect(function()
     _G.Active = not _G.Active
