@@ -19,7 +19,7 @@ _G.Active = false
 _G.Running = true
 _G.AutoReset = true
 
-local speed = 20
+local speed = 22
 local minSpeed = 10
 local maxSpeed = 30
 local maxCoins = 50 
