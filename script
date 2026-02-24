@@ -297,7 +297,7 @@ task.spawn(function()
 					if isFirstCoin then
 						root.CFrame = target.CFrame * CFrame.new(0, 2.7, 0)
 						isFirstCoin = false
-						task.wait(0.1)
+						task.wait(0.03)
 					else
 						local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = target.CFrame * CFrame.new(0,2.7,0)})
 						tween:Play()
