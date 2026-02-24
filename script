@@ -299,7 +299,7 @@ task.spawn(function()
 						isFirstCoin = false
 						task.wait(0.1)
 					else
-						local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Quint), {CFrame = target.CFrame * CFrame.new(0,2.7,0)})
+						local tween = TweenService:Create(root, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = target.CFrame * CFrame.new(0,2.7,0)})
 						tween:Play()
 						while _G.Active and target.Parent and not isFirstCoin and (root.Position - target.Position).Magnitude > 2 do
 							task.wait()
@@ -309,7 +309,7 @@ task.spawn(function()
 					ignored[target] = true
 				else
 					ignored = {}
-					task.wait(0.1)
+					task.wait(0.03)
 				end
 			end
 		end
