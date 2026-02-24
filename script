@@ -1,3 +1,19 @@
+-- ANTI AFK made by Muscle_legends2021 [Gio]
+ 
+local VirtualUser = game:GetService('VirtualUser')
+ 
+game:GetService('Players').LocalPlayer.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+ 
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "AntiAFK loaded!",
+    Text = "Made by Gio",
+    Button1 = "Thanks",
+    Duration = 5
+})
+task.wait(10)
 -- SERVICES
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -14,6 +30,8 @@ _G.AutoReset = true
 local speed = 22
 local coinCount = 0
 local ignored = {}
+local currentTween = nil
+local firstMove = true
 
 -- GUI CLEANUP
 if player.PlayerGui:FindFirstChild("FastFarm") then
@@ -21,33 +39,44 @@ if player.PlayerGui:FindFirstChild("FastFarm") then
 end
 
 -- SCREEN GUI
-local sg = Instance.new("ScreenGui")
+local sg = Instance.new("ScreenGui", player.PlayerGui)
 sg.Name = "FastFarm"
-sg.Parent = player.PlayerGui
 sg.ResetOnSpawn = false
 
 -- MAIN FRAME
 local main = Instance.new("Frame", sg)
-main.Size = UDim2.new(0,260,0,300)
-main.Position = UDim2.new(0.5,-130,0.5,-150)
-main.BackgroundColor3 = Color3.fromRGB(18,18,18)
-main.Active = true
-Instance.new("UICorner", main).CornerRadius = UDim.new(0,16)
+main.Size = UDim2.new(0, 270, 0, 320)
+main.Position = UDim2.new(0.5, -135, 0.5, -160)
+main.BackgroundColor3 = Color3.fromRGB(18,18,22)
+Instance.new("UICorner", main).CornerRadius = UDim.new(0,18)
 
 local stroke = Instance.new("UIStroke", main)
-stroke.Thickness = 1.5
-stroke.Color = Color3.fromRGB(70,70,70)
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(120,120,255)
 
-local grad = Instance.new("UIGradient", main)
-grad.Color = ColorSequence.new{
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(40,40,40)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(10,10,10))
+local bgGrad = Instance.new("UIGradient", main)
+bgGrad.Rotation = 90
+bgGrad.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(35,35,45)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(15,15,20))
 }
 
--- DRAG
+-- HEADER (DRAG ONLY HERE)
+local header = Instance.new("TextLabel", main)
+header.Size = UDim2.new(1, -60, 0, 40)
+header.Position = UDim2.new(0, 20, 0, 10)
+header.Text = "EXOTIC HUB"
+header.Font = Enum.Font.GothamBold
+header.TextSize = 22
+header.TextColor3 = Color3.fromRGB(230,230,255)
+header.BackgroundTransparency = 1
+header.TextXAlignment = Enum.TextXAlignment.Left
+header.Active = true
+
+-- DRAG LOGIC (HEADER ONLY)
 do
 	local dragging, dragStart, startPos
-	main.InputBegan:Connect(function(i)
+	header.InputBegan:Connect(function(i)
 		if i.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
 			dragStart = i.Position
@@ -70,55 +99,51 @@ do
 	end)
 end
 
--- TITLE
-local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1,-60,0,40)
-title.Position = UDim2.new(0,20,0,10)
-title.Text = "EXOTIC HUB"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 20
-title.TextColor3 = Color3.new(1,1,1)
-title.BackgroundTransparency = 1
-title.TextXAlignment = Left
-
 -- CLOSE
 local close = Instance.new("TextButton", main)
-close.Size = UDim2.new(0,28,0,28)
-close.Position = UDim2.new(1,-38,0,12)
+close.Size = UDim2.new(0,30,0,30)
+close.Position = UDim2.new(1,-40,0,10)
 close.Text = "X"
 close.Font = Enum.Font.GothamBold
 close.TextSize = 16
 close.TextColor3 = Color3.new(1,1,1)
-close.BackgroundColor3 = Color3.fromRGB(200,50,50)
+close.BackgroundColor3 = Color3.fromRGB(200,60,60)
 Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
 
 close.MouseButton1Click:Connect(function()
 	_G.Active = false
 	_G.Running = false
+	if currentTween then currentTween:Cancel() end
 	sg:Destroy()
 end)
 
 -- TOGGLE CREATOR
 local function createToggle(text, y, default, callback)
 	local holder = Instance.new("Frame", main)
-	holder.Size = UDim2.new(1,-40,0,40)
+	holder.Size = UDim2.new(1,-40,0,42)
 	holder.Position = UDim2.new(0,20,0,y)
 	holder.BackgroundTransparency = 1
 
 	local label = Instance.new("TextLabel", holder)
-	label.Size = UDim2.new(1,-60,1,0)
+	label.Size = UDim2.new(1,-70,1,0)
 	label.Text = text
 	label.Font = Enum.Font.GothamBold
 	label.TextSize = 16
-	label.TextColor3 = Color3.new(1,1,1)
+	label.TextColor3 = Color3.fromRGB(235,235,235)
 	label.BackgroundTransparency = 1
 	label.TextXAlignment = Left
 
 	local toggle = Instance.new("Frame", holder)
-	toggle.Size = UDim2.new(0,36,0,20)
-	toggle.Position = UDim2.new(1,-36,0.5,-10)
-	toggle.BackgroundColor3 = default and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0)
+	toggle.Size = UDim2.new(0,42,0,22)
+	toggle.Position = UDim2.new(1,-42,0.5,-11)
+	toggle.BackgroundColor3 = default and Color3.fromRGB(60,200,120) or Color3.fromRGB(200,70,70)
 	Instance.new("UICorner", toggle).CornerRadius = UDim.new(1,0)
+
+	local knob = Instance.new("Frame", toggle)
+	knob.Size = UDim2.new(0,18,0,18)
+	knob.Position = default and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9)
+	knob.BackgroundColor3 = Color3.fromRGB(245,245,245)
+	Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 
 	local hit = Instance.new("TextButton", toggle)
 	hit.Size = UDim2.new(1,0,1,0)
@@ -128,8 +153,11 @@ local function createToggle(text, y, default, callback)
 	local state = default
 	hit.MouseButton1Click:Connect(function()
 		state = not state
-		TweenService:Create(toggle, TweenInfo.new(0.15),
-			{BackgroundColor3 = state and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0)}
+		TweenService:Create(toggle, TweenInfo.new(0.2),
+			{BackgroundColor3 = state and Color3.fromRGB(60,200,120) or Color3.fromRGB(200,70,70)}
+		):Play()
+		TweenService:Create(knob, TweenInfo.new(0.2),
+			{Position = state and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9)}
 		):Play()
 		callback(state)
 	end)
@@ -137,62 +165,61 @@ end
 
 createToggle("Auto Farm", 70, false, function(v)
 	_G.Active = v
+	firstMove = true
 end)
 
 createToggle("Reset When Full Bag", 120, true, function(v)
 	_G.AutoReset = v
 end)
 
--- SPEED
-local speedTitle = Instance.new("TextLabel", main)
-speedTitle.Size = UDim2.new(1,0,0,30)
-speedTitle.Position = UDim2.new(0,0,0,170)
-speedTitle.Text = "Farm Speed"
-speedTitle.Font = Enum.Font.GothamBold
-speedTitle.TextSize = 18
-speedTitle.TextColor3 = Color3.new(1,1,1)
-speedTitle.BackgroundTransparency = 1
+-- SPEED SLIDER (bez drag konfliktu)
+local bar = Instance.new("Frame", main)
+bar.Size = UDim2.new(1,-60,0,8)
+bar.Position = UDim2.new(0,30,0,220)
+bar.BackgroundColor3 = Color3.fromRGB(60,60,70)
+Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
 
-local sliderBar = Instance.new("Frame", main)
-sliderBar.Size = UDim2.new(1,-60,0,6)
-sliderBar.Position = UDim2.new(0,30,0,215)
-sliderBar.BackgroundColor3 = Color3.fromRGB(80,80,80)
-Instance.new("UICorner", sliderBar).CornerRadius = UDim.new(1,0)
+local fill = Instance.new("Frame", bar)
+fill.BackgroundColor3 = Color3.fromRGB(120,120,255)
+fill.Size = UDim2.new((speed-15)/10,0,1,0)
+Instance.new("UICorner", fill).CornerRadius = UDim.new(1,0)
 
-local knob = Instance.new("Frame", sliderBar)
-knob.Size = UDim2.new(0,14,0,14)
-knob.Position = UDim2.new((speed-15)/10,-7,0.5,-7)
-knob.BackgroundColor3 = Color3.fromRGB(230,230,230)
+local knob = Instance.new("Frame", bar)
+knob.Size = UDim2.new(0,16,0,16)
+knob.Position = UDim2.new((speed-15)/10,-8,0.5,-8)
+knob.BackgroundColor3 = Color3.fromRGB(245,245,245)
 Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
+knob.Active = true
 
 local value = Instance.new("TextLabel", main)
 value.Size = UDim2.new(1,0,0,20)
-value.Position = UDim2.new(0,0,0,235)
+value.Position = UDim2.new(0,0,0,240)
 value.Text = tostring(speed)
 value.Font = Enum.Font.GothamBold
 value.TextSize = 14
-value.TextColor3 = Color3.new(1,1,1)
+value.TextColor3 = Color3.fromRGB(230,230,230)
 value.BackgroundTransparency = 1
 
-local dragging = false
+local draggingSlider = false
 knob.InputBegan:Connect(function(i)
 	if i.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
+		draggingSlider = true
 	end
 end)
 UserInputService.InputEnded:Connect(function(i)
 	if i.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = false
+		draggingSlider = false
 	end
 end)
 UserInputService.InputChanged:Connect(function(i)
-	if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+	if draggingSlider and i.UserInputType == Enum.UserInputType.MouseMovement then
 		local x = math.clamp(
-			(UserInputService:GetMouseLocation().X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X,
+			(UserInputService:GetMouseLocation().X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X,
 			0,1
 		)
 		speed = math.floor(15 + x*10)
-		knob.Position = UDim2.new(x,-7,0.5,-7)
+		fill.Size = UDim2.new(x,0,1,0)
+		knob.Position = UDim2.new(x,-8,0.5,-8)
 		value.Text = tostring(speed)
 	end
 end)
@@ -208,39 +235,29 @@ RunService.Stepped:Connect(function()
 	end
 end)
 
--- COIN TOUCH
+-- TOUCH
 local function setupTouch(char)
 	local root = char:WaitForChild("HumanoidRootPart")
 	root.Touched:Connect(function(hit)
-		if _G.Active and (hit.Name == "Coin" or hit.Name == "Coin_Server") and not ignored[hit] then
+		if _G.Active and (hit.Name=="Coin" or hit.Name=="Coin_Server") and not ignored[hit] then
 			ignored[hit] = true
 			coinCount += 1
 		end
 	end)
 end
 
-if player.Character then
-	setupTouch(player.Character)
-end
-
+if player.Character then setupTouch(player.Character) end
 player.CharacterAdded:Connect(function(char)
 	coinCount = 0
 	ignored = {}
+	firstMove = true
 	setupTouch(char)
 end)
 
--- FARM LOOP
+-- FARM LOOP (FIXED FIRST TWEEN)
 task.spawn(function()
 	while _G.Running do
 		if _G.Active then
-			if _G.AutoReset and coinCount >= 40 then
-				_G.Active = false
-				player.Character.Humanoid.Health = 0
-				player.CharacterAdded:Wait()
-				task.wait(1)
-				_G.Active = true
-			end
-
 			local char = player.Character
 			local root = char and char:FindFirstChild("HumanoidRootPart")
 			if root then
@@ -249,7 +266,6 @@ task.spawn(function()
 					if (v.Name=="Coin" or v.Name=="Coin_Server")
 						and v:IsA("BasePart")
 						and not ignored[v] then
-
 						local d = (root.Position - v.Position).Magnitude
 						if d < dist then
 							dist = d
@@ -259,23 +275,22 @@ task.spawn(function()
 				end
 
 				if target then
-					local tween = TweenService:Create(
+					if currentTween then currentTween:Cancel() end
+					if firstMove then
+						task.wait(0.15)
+						firstMove = false
+					end
+					local time = math.max(dist / speed, 0.15)
+					currentTween = TweenService:Create(
 						root,
-						TweenInfo.new(dist/speed, Enum.EasingStyle.Linear),
+						TweenInfo.new(time, Enum.EasingStyle.Linear),
 						{CFrame = target.CFrame * CFrame.new(0,3,0)}
 					)
-					tween:Play()
-
-					while _G.Active and target.Parent
-						and (root.Position - target.Position).Magnitude > 2 do
-						task.wait()
-					end
-
-					tween:Cancel()
+					currentTween:Play()
+					currentTween.Completed:Wait()
 					ignored[target] = true
 				else
 					ignored = {}
-					task.wait(0.1)
 				end
 			end
 		end
