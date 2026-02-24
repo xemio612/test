@@ -1,3 +1,11 @@
+local function playClickSound()
+	local s = Instance.new("Sound")
+	s.SoundId = "rbxassetid://5852470908"
+	s.Volume = 1
+	s.Parent = sg
+	s:Play()
+	game:GetService("Debris"):AddItem(s, s.TimeLength)
+end
 -- SERVICES
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -97,6 +105,7 @@ close.ZIndex = 5
 Instance.new("UICorner", close).CornerRadius = UDim.new(0, 8)
 
 close.MouseButton1Click:Connect(function()
+playClickSound()
 	_G.Active = false
 	_G.Running = false
 	sg:Destroy()
@@ -137,6 +146,7 @@ local function createToggle(text, y, default, callback)
 
 	local state = default
 	hit.MouseButton1Click:Connect(function()
+playClickSound()
 		state = not state
 		if text == "Auto Farm" then isFirstCoin = true end
 		TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = state and Color3.fromRGB(60,200,120) or Color3.fromRGB(200,70,70)}):Play()
