@@ -13,7 +13,7 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
     Button1 = "Thanks",
     Duration = 5
 })
-task.wait(10)
+
 -- SERVICES
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
